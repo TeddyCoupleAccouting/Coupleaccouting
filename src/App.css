@@ -1263,11 +1263,13 @@ body {
   background: #fffafb;
 }
 
+
 /* Transactions and activity */
 
 .transaction-list {
   display: flex;
   flex-direction: column;
+  gap: 0;
 }
 
 .transaction-row {
@@ -1275,29 +1277,29 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid #f2edf5;
+  padding: 16px 0;
+  border-bottom: 1px solid #f0eaf5;
 }
 
 .transaction-row:first-child {
-  padding-top: 0;
+  padding-top: 4px;
 }
 
 .transaction-row:last-child {
-  padding-bottom: 0;
+  padding-bottom: 4px;
   border-bottom: none;
 }
 
 .transaction-icon {
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
-  background: #f5effa;
-  font-size: 20px;
+  border-radius: 16px;
+  background: #f4eefb;
+  font-size: 21px;
 }
 
 .transaction-info {
@@ -1315,21 +1317,33 @@ body {
 
 .transaction-info strong {
   color: #44384f;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.5;
 }
 
 .transaction-info span {
   margin-top: 4px;
-  color: #a097aa;
+  color: #95899f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.household-payment-details {
+  margin-top: 7px;
+  color: #887995;
   font-size: 10px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .transaction-amount {
   flex-shrink: 0;
-  font-size: 12px;
+  max-width: 35%;
+  font-size: 13px;
   font-weight: 750;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .transaction-amount.expense {
@@ -1356,29 +1370,220 @@ body {
 
 .activity-count {
   padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--accent-light);
-  color: var(--accent);
-  font-size: 10px;
+  border-radius: 10px;
+  background: #f3ecfa;
+  color: #80639b;
+  font-size: 11px;
   font-weight: 750;
   white-space: nowrap;
 }
 
 .search-input {
   width: 100%;
-  min-height: 43px;
-  margin-bottom: 20px;
-  padding: 10px 14px;
+  min-height: 46px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
   border: 1px solid #e9e1ef;
-  border-radius: 11px;
+  border-radius: 13px;
   background: #fdfbfe;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
+  box-sizing: border-box;
 }
 
 .search-input:focus {
   border-color: #bda3d7;
   outline: 3px solid #f0e8f8;
+}
+
+/* Activity filters */
+
+.activity-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.activity-type-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.activity-filter-button {
+  min-height: 38px;
+  padding: 9px 15px;
+  border: 1px solid #e9e1ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #81738f;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.activity-filter-button:hover {
+  border-color: #cbb4e2;
+  background: #faf7fd;
+}
+
+.activity-filter-button.active {
+  border-color: #d9c3ef;
+  background: #f0e7fa;
+  color: #7955a2;
+}
+
+.activity-category-select {
+  min-height: 38px;
+  max-width: 100%;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #e9e1ef;
+  border-radius: 12px;
+  background: #fdfbfe;
+  color: #695b78;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.activity-category-select:focus {
+  border-color: #bda3d7;
+  outline: 3px solid #f0e8f8;
+}
+
+.activity-date-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 20px;
+}
+
+.activity-date-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #8d7b9b;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.activity-date-filters input {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #e9e1ef;
+  border-radius: 11px;
+  background: #fdfbfe;
+  color: #695b78;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.activity-clear-dates {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #e9e1ef;
+  border-radius: 11px;
+  background: white;
+  color: #80639b;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .activity-date-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .activity-date-filters label,
+  .activity-date-filters input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .activity-clear-dates {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .activity-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-type-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .activity-filter-button {
+    padding: 9px 6px;
+  }
+
+  .activity-category-select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .transaction-row {
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .transaction-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    font-size: 19px;
+  }
+
+  .transaction-info strong {
+    font-size: 12px;
+  }
+
+  .transaction-info span {
+    font-size: 10px;
+  }
+
+  .transaction-amount {
+    font-size: 12px;
+  }
+}
+
+.activity-person-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.activity-person-filter label {
+  color: #8d7b9b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.activity-person-filter select {
+  min-width: 180px;
+}
+
+@media (max-width: 480px) {
+  .activity-person-filter {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .activity-person-filter select {
+    width: 100%;
+  }
 }
 
 /* Add transaction modal */
@@ -1930,7 +2135,7 @@ body {
 
 .household-balance-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 4fr);
+  grid-template-columns: minmax(0, 2fr) minmax(200px, 1fr);
   gap: 1rem;
   align-items: stretch;
   margin-bottom: 1rem;
@@ -1943,6 +2148,7 @@ body {
 .household-balance-layout .balance-card {
   min-width: 0;
   margin-bottom: 0;
+  width: 100%;
 }
 
 @media (max-width: 600px) {
@@ -1950,7 +2156,6 @@ body {
     grid-template-columns: 1fr;
   }
 }
-
 
 .household-members-heading {
   display: flex;
@@ -2469,4 +2674,303 @@ body {
   margin: 0;
   color: #6f568f;
   font-size: 14px;
+}
+
+.activity-secondary-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 16px 0 20px;
+}
+
+.activity-secondary-filters .activity-date-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0;
+}
+
+.activity-secondary-filters .activity-person-filter {
+  margin: 0;
+}
+
+.activity-secondary-filters .activity-category-select {
+  width: 180px;
+  min-width: 150px;
+}
+
+@media (max-width: 768px) {
+  .activity-secondary-filters {
+    align-items: stretch;
+  }
+
+  .activity-secondary-filters .activity-date-filters {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .activity-secondary-filters,
+  .activity-secondary-filters .activity-date-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .activity-secondary-filters .activity-category-select {
+    width: 100%;
+  }
+}
+
+.activity-secondary-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 16px 0 20px;
+}
+
+.activity-secondary-filters .activity-date-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0;
+}
+
+.activity-secondary-filters .activity-person-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.activity-secondary-filters .activity-category-select {
+  width: 180px;
+  min-width: 150px;
+}
+
+@media (max-width: 768px) {
+  .activity-secondary-filters {
+    align-items: stretch;
+  }
+
+  .activity-secondary-filters .activity-date-filters {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .activity-secondary-filters,
+  .activity-secondary-filters .activity-date-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .activity-secondary-filters .activity-category-select {
+    width: 100%;
+  }
+}
+
+
+/* Transaction details modal */
+.transaction-details-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 20px 0;
+}
+
+.transaction-details-amount {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 20px;
+  color: #7650a8;
+}
+
+.transaction-detail-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid #eee7f5;
+}
+
+.transaction-detail-row span {
+  color: #81778b;
+  flex-shrink: 0;
+}
+
+.transaction-detail-row strong {
+  color: #352943;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.transaction-details-content + .primary-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .transaction-modal {
+    width: calc(100% - 32px);
+    max-width: none;
+    padding: 22px;
+  }
+
+  .transaction-detail-row {
+    gap: 12px;
+  }
+}
+
+
+.transaction-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 24px;
+  width: 100%;
+}
+
+.transaction-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #5b4b6b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.transaction-edit-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid #e4d8ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #352943;
+  font: inherit;
+  font-weight: 400;
+}
+
+.transaction-edit-form input:focus {
+  outline: none;
+  border-color: #9670bd;
+  box-shadow: 0 0 0 3px rgba(150, 112, 189, 0.15);
+}
+
+.transaction-edit-form .secondary-button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+.transaction-modal {
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+
+.transaction-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.transaction-detail-actions button {
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.transaction-detail-actions .secondary-button {
+  background: #f5effb;
+  color: #7650a8;
+  border: 1px solid #e5d6f3;
+}
+
+.transaction-detail-actions .secondary-button:hover {
+  background: #eadcf7;
+}
+
+.transaction-detail-actions .primary-button {
+  background: #8f68b5;
+  color: #fff;
+  border: 1px solid #8f68b5;
+  box-shadow: 0 4px 10px rgba(143, 104, 181, 0.18);
+}
+
+.transaction-detail-actions .primary-button:hover {
+  background: #79529f;
+  border-color: #79529f;
+}
+
+.transaction-edit-form .secondary-button {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #e5d6f3;
+  border-radius: 12px;
+  background: #f5effb;
+  color: #7650a8;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.transaction-edit-form .secondary-button:hover {
+  background: #eadcf7;
+}
+
+
+.transaction-edit-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.transaction-edit-actions button {
+  flex: 1;
+  min-height: 46px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.transaction-edit-actions .secondary-button {
+  border: 1px solid #e5d6f3;
+  background: #f5effb;
+  color: #7650a8;
+}
+
+.transaction-edit-actions .primary-button {
+  border: 1px solid #8f68b5;
+  background: #8f68b5;
+  color: white;
+}
+
+.transaction-edit-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.transaction-edit-form .form-error {
+  color: #c2415d;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
 }

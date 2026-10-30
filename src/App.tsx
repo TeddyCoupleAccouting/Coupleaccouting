@@ -17,6 +17,7 @@ type Transaction = {
   type: TransactionType;
   space: Space;
   date: string;
+  notes?: string | null;
   icon: string;
   paidByUserId?: string;
 splitMethod?: string | null;
@@ -241,7 +242,35 @@ const [repaymentSaving, setRepaymentSaving] = useState(false);
 const [saving, setSaving] = useState(false);
 const [saveError, setSaveError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
-  const [search, setSearch] = useState("");
+  
+const [selectedTransaction, setSelectedTransaction] =
+  useState<Transaction | null>(null);
+
+const [isEditingTransaction, setIsEditingTransaction] = useState(false);
+const [editName, setEditName] = useState("");
+const [editAmount, setEditAmount] = useState("");
+const [editNotes, setEditNotes] = useState("");
+const [editCategory, setEditCategory] = useState("");
+const [editDate, setEditDate] = useState("");
+
+const [editError, setEditError] = useState("");
+const [savingEdit, setSavingEdit] = useState(false);
+
+const [search, setSearch] = useState("");
+
+const [activityTypeFilter, setActivityTypeFilter] = useState<
+  "all" | "expense" | "income"
+>("all");
+
+const [activityCategoryFilter, setActivityCategoryFilter] =
+  useState("all");
+
+const [activityPersonFilter, setActivityPersonFilter] =
+  useState("all");
+
+const [activityStartDate, setActivityStartDate] = useState("");
+const [activityEndDate, setActivityEndDate] = useState("");
+
   const [kind, setKind] = useState<TransactionType>("expense");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -266,8 +295,8 @@ const [saveError, setSaveError] = useState("");
       const { data, error } = await supabase
         .from("transactions")
         .select(
-        "id, scope, kind, amount, description, occurred_on, category_id, paid_by, split_method"
-        )
+      "id, scope, kind, amount, description, occurred_on, category_id, paid_by, split_method, notes"
+)
         .order("occurred_on", { ascending: false });
 
       if (error) {
@@ -297,11 +326,11 @@ const [saveError, setSaveError] = useState("");
         type: item.kind,
         space: item.scope === "shared" ? "household" : "personal",
         date: item.occurred_on,
+        notes: item.notes,
         icon: item.kind === "income" ? "💰" : "🧾",
         paidByUserId: item.paid_by,
         splitMethod: item.split_method,
       }));
-
 
 const { data: splits, error: splitsError } = await supabase
   .from("transaction_splits")
@@ -410,9 +439,41 @@ for (const settlement of loadedSettlements) {
     (item) => item.space === space
   );
 
-  const filteredTransactions = visibleTransactions.filter((item) =>
-    `${item.name} ${item.category}`.toLowerCase().includes(search.toLowerCase())
+  
+const filteredTransactions = visibleTransactions.filter((item) => {
+  const matchesSearch =
+    `${item.name} ${item.category}`
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+  const matchesType =
+    activityTypeFilter === "all" ||
+    item.type === activityTypeFilter;
+
+  const matchesCategory =
+    activityCategoryFilter === "all" ||
+    item.category === activityCategoryFilter;
+
+  const matchesStartDate =
+    !activityStartDate || item.date >= activityStartDate;
+
+  const matchesEndDate =
+    !activityEndDate || item.date.slice(0, 10) <= activityEndDate;
+    const matchesPerson =
+  activityPersonFilter === "all" ||
+  (
+    item.space === "household" &&
+    item.paidByUserId === activityPersonFilter
   );
+  return (
+  matchesSearch &&
+  matchesType &&
+  matchesCategory &&
+  matchesStartDate &&
+  matchesEndDate &&
+  matchesPerson
+ );
+});
 
   const totalIncome = visibleTransactions
     .filter((item) => item.type === "income")
@@ -864,6 +925,202 @@ if (splitError) {
 
 
 
+
+async function handleSaveTransactionEdit() {
+  if (!session || !selectedTransaction) {
+    setEditError("Please sign in again before editing.");
+    return;
+  }
+
+  const trimmedName = editName.trim();
+  const value = Number(editAmount);
+
+  const existingShares = selectedTransaction.shares ?? [];
+
+  const existingSharesTotal = existingShares.reduce(
+    (total, share) => total + Math.round(share.amount * 100),
+    0
+  );
+
+  const isChangingSharedExpenseAmount =
+    selectedTransaction.space === "household" &&
+    selectedTransaction.type === "expense" &&
+    Math.round(value * 100) !==
+      Math.round(selectedTransaction.amount * 100);
+
+  if (!trimmedName) {
+    setEditError("Please enter a transaction name.");
+    return;
+  }
+
+  if (!Number.isFinite(value) || value <= 0) {
+    setEditError("Please enter an amount greater than zero.");
+    return;
+  }
+
+  if (!editDate) {
+    setEditError("Please select a transaction date.");
+    return;
+  }
+
+  if (!editCategory.trim()) {
+    setEditError("Please enter a category.");
+    return;
+  }
+
+  if (isChangingSharedExpenseAmount) {
+    if (existingShares.length === 0) {
+      setEditError(
+        "No existing expense splits were found. Please check this transaction first."
+      );
+      return;
+    }
+
+    if (
+      existingSharesTotal !==
+      Math.round(selectedTransaction.amount * 100)
+    ) {
+      setEditError(
+        "The existing split amounts don't match the transaction total. Please check the split records first."
+      );
+      return;
+    }
+  }
+
+  let recalculatedShares: {
+    user_id: string;
+    share_amount: number;
+  }[] = [];
+
+  if (isChangingSharedExpenseAmount) {
+    const totalCents = Math.round(value * 100);
+    const originalTotalCents = existingSharesTotal;
+    let allocatedCents = 0;
+
+    recalculatedShares = existingShares.map((share, index) => {
+      const shareCents =
+        index === existingShares.length - 1
+          ? totalCents - allocatedCents
+          : Math.round(
+              (totalCents * Math.round(share.amount * 100)) /
+                originalTotalCents
+            );
+
+      allocatedCents += shareCents;
+
+      return {
+        user_id: share.userId,
+        share_amount: shareCents / 100,
+      };
+    });
+  }
+
+  setSavingEdit(true);
+  setEditError("");
+
+  try {
+    const categoryNames: Record<string, string> = {
+      Food: "Food & Groceries",
+      Groceries: "Food & Groceries",
+      Housing: "Rent",
+      Bills: "Utilities",
+      Transport: "Transportation",
+      Health: "Healthcare",
+      Other: "Other Expenses",
+      Salary: "Salary",
+      Freelance: "Freelance",
+      "Business income": "Other Income",
+      "Other income": "Other Income",
+    };
+
+    const databaseCategoryName =
+      categoryNames[editCategory.trim()] ?? editCategory.trim();
+
+    const { data: categoryRow, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("name", databaseCategoryName)
+      .eq("kind", selectedTransaction.type)
+      .limit(1)
+      .maybeSingle();
+
+    if (categoryError) throw categoryError;
+
+    if (!categoryRow) {
+      throw new Error(
+        `The category "${databaseCategoryName}" is not available for this transaction type.`
+      );
+    }
+
+if (isChangingSharedExpenseAmount) {
+  const { error: rpcError } = await supabase.rpc(
+    "update_household_expense_with_splits",
+    {
+      p_transaction_id: selectedTransaction.id,
+      p_description: trimmedName,
+      p_amount: value,
+      p_category_id: categoryRow.id,
+      p_occurred_on: editDate,
+      p_notes: editNotes.trim() || null,
+      p_splits: recalculatedShares,
+    }
+  );
+
+  if (rpcError) throw rpcError;
+} else {
+  const { error: updateError } = await supabase
+    .from("transactions")
+    .update({
+      description: trimmedName,
+      amount: value,
+      category_id: categoryRow.id,
+      occurred_on: editDate,
+      notes: editNotes.trim() || null,
+    })
+    .eq("id", selectedTransaction.id);
+
+  if (updateError) throw updateError;
+}
+
+const updatedTransaction: Transaction = {
+  ...selectedTransaction,
+  name: trimmedName,
+  amount: value,
+  category: databaseCategoryName,
+  date: editDate,
+  notes: editNotes.trim() || null,
+  shares: isChangingSharedExpenseAmount
+    ? recalculatedShares.map((share) => ({
+        userId: share.user_id,
+        amount: share.share_amount,
+      }))
+    : selectedTransaction.shares,
+};
+
+    setTransactions((current) =>
+      current.map((transaction) =>
+       String(transaction.id) === String(selectedTransaction.id)
+        ? updatedTransaction
+        : transaction
+      )
+      );
+
+    setSelectedTransaction(updatedTransaction);
+    setIsEditingTransaction(false);
+    setEditError("");
+  } catch (error) {
+    console.error("Failed to update transaction:", error);
+    setEditError(
+      error instanceof Error
+        ? error.message
+        : "Could not save your changes. Please try again."
+    );
+  } finally {
+    setSavingEdit(false);
+  }
+}
+
+
 async function handleSaveRepayment() {
   if (!session) return;
 
@@ -1082,14 +1339,45 @@ return (
                 <span className="banner-decoration decoration-one">✦</span>
                 <span className="banner-decoration decoration-two">♡</span>
               </section>
-
-            
+  
 <div className="household-balance-layout">
-  <section
+              <section className="balance-card">
+                <div className="balance-heading">
+                  <span className="balance-icon">♡</span>
+                  <div>
+                    <span className="card-label">WHO OWES WHOM?</span>
+                    <h2>
+  {sharedBalance > 0
+    ? "Your partner owes you"
+    : sharedBalance < 0
+      ? "You owe your partner"
+      : "You're all settled!"}
+</h2>
+                  </div>
+                </div>
+                <div className="balance-main">
+                  <div>
+                    <div className="balance-amount">{money(sharedBalance)}</div>
+                    <p className="balance-subtitle">
+  {sharedBalance > 0
+    ? "Your partner needs to pay you back. 💕"
+    : sharedBalance < 0
+      ? "You need to pay your partner back. 💕"
+      : "Keep being a great team. 💕"}
+      </p>
+                  </div>
+                  <div className="balance-illustration">🫶</div>
+                </div>
+                <button className="text-link" onClick={() => setTab("Activity")}>
+                  View expense ledger <span>→</span>
+                </button>
+              </section>
+              
+<section
     className="panel household-members-card"
     style={{ marginBottom: "0", padding: "0.4rem 0.7rem" }}
   >
-  
+    
 <div className="panel-heading">
   <div className="household-members-heading">
     <span className="balance-icon">♧</span>
@@ -1115,42 +1403,7 @@ return (
     <p>No household members found yet.</p>
   )}
 </section>
-
-              <section className="balance-card">
-                <div className="balance-heading">
-                  <span className="balance-icon">♡</span>
-                  <div>
-                    <span className="card-label">WHO OWES WHOM?</span>
-                    <h2>
-  {sharedBalance > 0
-    ? "Your partner owes you"
-    : sharedBalance < 0
-      ? "You owe your partner"
-      : "You're all settled!"}
-</h2>
-                  </div>
-                  
-                </div>
-                <div className="balance-main">
-                  <div>
-                    <div className="balance-amount">{money(sharedBalance)}</div>
-                    <p className="balance-subtitle">
-  {sharedBalance > 0
-    ? "Your partner needs to pay you back. 💕"
-    : sharedBalance < 0
-      ? "You need to pay your partner back. 💕"
-      : "Keep being a great team. 💕"}
-      </p>
-                  </div>
-                  <div className="balance-illustration">🫶</div>
-                </div>
-                <button className="text-link" onClick={() => setTab("Activity")}>
-                  View expense ledger <span>→</span>
-                </button>
-              </section>
-              </div>
-              
-
+</div>
 
               <section className="summary-grid">
                 <article className="summary-card">
@@ -1241,7 +1494,8 @@ return (
                   items={visibleTransactions.slice(0, 3)}
                   householdMembers={householdMembers}
                   currentUserId={session?.user.id ?? ""}
-/>
+                  onSelectTransaction={setSelectedTransaction}
+                  />
                 </article>
               </section>
               <section className="panel repayment-panel">
@@ -1499,7 +1753,9 @@ return (
                     <div><span className="section-kicker">JUST YOURS</span><h2>Recent transactions</h2></div>
                     <button className="subtle-button" onClick={() => setTab("Activity")}>View all →</button>
                   </div>
-                  <TransactionList items={visibleTransactions.slice(0, 4)} />
+                  <TransactionList items={visibleTransactions.slice(0, 4)} 
+                  onSelectTransaction={setSelectedTransaction}
+                  />
                 </article>
               </section>
             </>
@@ -1602,14 +1858,128 @@ return (
                 <div><span className="section-kicker">YOUR MONEY, IN MOTION</span><h2>{personal ? "My transactions" : "Household activity"}</h2></div>
                 <span className="activity-count">{filteredTransactions.length} records</span>
               </div>
-              <input
-                className="search-input"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search transactions..."
-                aria-label="Search transactions"
-              />
-              <TransactionList items={filteredTransactions} />
+              
+<input
+  className="search-input"
+  value={search}
+  onChange={(event) => setSearch(event.target.value)}
+  placeholder="Search transactions..."
+  aria-label="Search transactions"
+/>
+
+<div className="activity-filters">
+  <div className="activity-type-filters">
+    {[
+      { label: "All", value: "all" },
+      { label: "Expenses", value: "expense" },
+      { label: "Income", value: "income" },
+    ].map((option) => (
+      <button
+        key={option.value}
+        type="button"
+        className={
+          activityTypeFilter === option.value
+            ? "activity-filter-button active"
+            : "activity-filter-button"
+        }
+        onClick={() =>
+          setActivityTypeFilter(
+            option.value as "all" | "expense" | "income"
+          )
+        }
+      >
+        {option.label}
+      </button>
+    ))}
+  </div>
+</div>
+
+<div className="activity-secondary-filters">
+  <div className="activity-date-filters">
+    <label>
+      <span>From</span>
+      <input
+        type="date"
+        value={activityStartDate}
+        onChange={(event) => setActivityStartDate(event.target.value)}
+        aria-label="Start date"
+      />
+    </label>
+
+    <label>
+      <span>To</span>
+      <input
+        type="date"
+        value={activityEndDate}
+        min={activityStartDate || undefined}
+        onChange={(event) => setActivityEndDate(event.target.value)}
+        aria-label="End date"
+      />
+    </label>
+
+    {(activityStartDate || activityEndDate) && (
+      <button
+        type="button"
+        className="activity-clear-dates"
+        onClick={() => {
+          setActivityStartDate("");
+          setActivityEndDate("");
+        }}
+      >
+        Clear dates
+      </button>
+    )}
+  </div>
+
+  {!personal && (
+    <div className="activity-person-filter">
+      <label htmlFor="activity-person-select">Paid by</label>
+      <select
+        id="activity-person-select"
+        className="activity-category-select"
+        value={activityPersonFilter}
+        onChange={(event) =>
+          setActivityPersonFilter(event.target.value)
+        }
+      >
+        <option value="all">Everyone</option>
+        {householdMembers.map((member) => (
+          <option key={member.user_id} value={member.user_id}>
+            {member.user_id === session?.user.id
+              ? `Me (${member.display_name})`
+              : member.display_name}
+          </option>
+        ))}
+      </select>
+    </div>
+  )}
+
+  <select
+    className="activity-category-select"
+    value={activityCategoryFilter}
+    onChange={(event) =>
+      setActivityCategoryFilter(event.target.value)
+    }
+    aria-label="Filter by category"
+  >
+    <option value="all">All categories</option>
+    {[...new Set(visibleTransactions.map((item) => item.category))]
+      .sort()
+      .map((category) => (
+        <option key={category} value={category}>
+          {category}
+        </option>
+      ))}
+  </select>
+</div>
+
+<TransactionList 
+   items={filteredTransactions}
+   householdMembers={householdMembers}
+   currentUserId={session?.user.id ?? ""}
+   onSelectTransaction={setSelectedTransaction} 
+   />
+
               {filteredTransactions.length === 0 && <p className="empty-message">No matching transactions yet.</p>}
             </section>
           )}
@@ -1831,7 +2201,217 @@ return (
             </form>
           </section>
         </div>
+      
       )}
+
+      {selectedTransaction && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedTransaction(null);
+            }
+          }}
+        >
+          <section
+            className="transaction-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-details-title"
+          >
+            <div className="modal-heading">
+              <div>
+                <span className="section-kicker">
+                  TRANSACTION DETAILS
+                </span>
+                <h2 id="transaction-details-title">
+                  {selectedTransaction.name}
+                </h2>
+              </div>
+
+              <button
+                className="close-button"
+                onClick={() => setSelectedTransaction(null)}
+                aria-label="Close transaction details"
+              >
+                ×
+              </button>
+            </div>
+
+            
+{isEditingTransaction ? (
+  <div className="transaction-edit-form">
+    <label>
+      Transaction name
+      <input
+        type="text"
+        value={editName}
+        onChange={(event) => setEditName(event.target.value)}
+      />
+    </label>
+
+    <label>
+      Notes
+      <textarea
+        value={editNotes}
+        onChange={(event) => setEditNotes(event.target.value)}
+        placeholder="Add a note (optional)"
+        rows={3}
+      />
+    </label>
+
+    <label>
+      Amount (฿)
+      <input
+        type="number"
+        min="0.01"
+        step="0.01"
+        value={editAmount}
+        onChange={(event) => setEditAmount(event.target.value)}
+      />
+    </label>
+
+    <label>
+      Category
+      <input
+        type="text"
+        value={editCategory}
+        onChange={(event) => setEditCategory(event.target.value)}
+      />
+    </label>
+
+    <label>
+      Date
+      <input
+        type="date"
+        value={editDate}
+        onChange={(event) => setEditDate(event.target.value)}
+      />
+    </label>
+
+    
+{editError && (
+  <p className="form-error" role="alert">
+    {editError}
+  </p>
+)}
+
+<div className="transaction-edit-actions">
+  <button
+    className="secondary-button"
+    type="button"
+    disabled={savingEdit}
+    onClick={() => {
+      setIsEditingTransaction(false);
+      setEditError("");
+    }}
+  >
+    Cancel
+  </button>
+
+  <button
+    className="primary-button"
+    type="button"
+    disabled={savingEdit}
+    onClick={handleSaveTransactionEdit}
+  >
+    {savingEdit ? "Saving..." : "Save Changes"}
+  </button>
+</div>
+  </div>
+) : (
+  <div className="transaction-details-content">
+    <p className="transaction-details-amount">
+      {selectedTransaction.type === "expense" ? "−" : "+"}
+      ฿{selectedTransaction.amount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}
+    </p>
+
+    <div className="transaction-detail-row">
+      <span>Type</span>
+      <strong>
+        {selectedTransaction.type === "expense" ? "Expense" : "Income"}
+      </strong>
+    </div>
+
+    <div className="transaction-detail-row">
+      <span>Category</span>
+      <strong>{selectedTransaction.category}</strong>
+    </div>
+
+    <div className="transaction-detail-row">
+      <span>Date</span>
+      <strong>{selectedTransaction.date}</strong>
+    </div>
+
+    <div className="transaction-detail-row">
+      <span>Account</span>
+      <strong>
+        {selectedTransaction.space === "household"
+          ? "💜 Household"
+          : "🌷 Personal"}
+      </strong>
+    </div>
+
+    {selectedTransaction.space === "household" &&
+      selectedTransaction.type === "expense" && (
+        <>
+          <div className="transaction-detail-row">
+            <span>Paid by</span>
+            <strong>
+              {householdMembers.find(
+                (member) =>
+                  member.user_id === selectedTransaction.paidByUserId
+              )?.display_name ?? "Unknown"}
+            </strong>
+          </div>
+
+          <div className="transaction-detail-row">
+            <span>Split method</span>
+            <strong>
+              {selectedTransaction.splitMethod ?? "Not specified"}
+            </strong>
+          </div>
+        </>
+      )}
+  </div>
+)}
+            
+{!isEditingTransaction && (
+  <div className="transaction-detail-actions">
+    <button
+      className="secondary-button"
+      type="button"
+      onClick={() => {
+        if (!selectedTransaction) return;
+
+        setEditName(selectedTransaction.name);
+        setEditAmount(String(selectedTransaction.amount));
+        setEditNotes(selectedTransaction.notes ?? "");
+        setEditCategory(selectedTransaction.category);
+        setEditDate(selectedTransaction.date);
+        setEditError("");
+        setIsEditingTransaction(true);
+      }}
+    >
+      ✏️ Edit
+    </button>
+
+    <button
+      className="primary-button"
+      type="button"
+      onClick={() => setSelectedTransaction(null)}
+    >
+      Close
+    </button>
+  </div>
+)}
+          </section>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1854,10 +2434,12 @@ function TransactionList({
   items,
   householdMembers = [],
   currentUserId = "",
+  onSelectTransaction,
 }: {
   items: Transaction[];
   householdMembers?: HouseholdMember[];
   currentUserId?: string;
+  onSelectTransaction: (item: Transaction) => void;
 }) {
   
   if (items.length === 0) {
@@ -1903,8 +2485,20 @@ function TransactionList({
   }
 
   return (
-    <div className="transaction-row" key={item.id}>
-      <div className="transaction-icon">{item.icon}</div>
+<div
+  className="transaction-row"
+  key={item.id}
+  role="button"
+  tabIndex={0}
+  onClick={() => onSelectTransaction(item)}
+  onKeyDown={(event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelectTransaction(item);
+    }
+  }}
+>
+        <div className="transaction-icon">{item.icon}</div>
       <div className="transaction-info">
         <strong>{item.name}</strong>
         <span>{item.category} · {formatTransactionDate(item.date)}</span>
