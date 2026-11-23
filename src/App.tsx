@@ -1861,7 +1861,7 @@ return (
             <>
               <section className="couple-banner">
                 <div className="couple-copy">
-                  <span className="banner-kicker">OUR LITTLE MONEY CHECK-IN</span>
+                  <span className="banner-kicker">OUR LITTLE MONEY</span>
                   <h2>Teamwork looks good on you. 💕</h2>
                   <p>Every small step helps build the life you want together.</p>
                 </div>
