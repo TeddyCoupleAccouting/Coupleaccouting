@@ -1793,7 +1793,7 @@ return (
             onClick={() => changeTab(item)}
           >
             <span className="mobile-bottom-nav-icon">
-              {({ Home: "⌂", Activity: "◷", Reports: "▤", "My Finance": "♡", Settings: "⚙️" } as Record<Tab, string>)[item]}
+              {({ Home: "🏠", Activity: "🕒", Reports: "📊", "My Finance": "💜", Settings: "⚙️" } as Record<Tab, string>)[item]}
             </span>
             <span>{item === "My Finance" ? "My Finance" : item}</span>
           </button>
@@ -2885,10 +2885,10 @@ return (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => changeTab(item)}>
             <span>
         {{
-               Home: "⌂",
-               Activity: "◷",
-               Reports: "▤",
-               "My Finance": "♡",
+               Home: "🏠",
+               Activity: "🕒",
+               Reports: "📊",
+               "My Finance": "💜",
                Settings: "⚙️",
          }[item]}
 </span>
