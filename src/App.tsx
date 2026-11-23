@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { jsPDF } from "jspdf";
 import type { Session } from "@supabase/supabase-js";
 import "./App.css";
 import { supabase } from "./supabase";
@@ -592,6 +593,222 @@ const householdCategoryEntries = Object.entries(
 const highestCategoryAmount =
   householdCategoryEntries[0]?.[1] ?? 0;
 
+  // REPORTS — selected space and selected month
+const reportMonthTransactions = transactions.filter(
+  (item) =>
+    item.space === space &&
+    item.date.slice(0, 7) === selectedMonth
+);
+
+const reportPreviousMonthTransactions = transactions.filter(
+  (item) =>
+    item.space === space &&
+    item.date.slice(0, 7) === previousMonth
+);
+
+// Monthly income and expenses
+const reportIncome = reportMonthTransactions
+  .filter((item) => item.type === "income")
+  .reduce((sum, item) => sum + item.amount, 0);
+
+const reportExpenses = reportMonthTransactions
+  .filter((item) => item.type === "expense")
+  .reduce((sum, item) => sum + item.amount, 0);
+
+const reportBalance = reportIncome - reportExpenses;
+
+// Previous month
+const reportPreviousIncome = reportPreviousMonthTransactions
+  .filter((item) => item.type === "income")
+  .reduce((sum, item) => sum + item.amount, 0);
+
+const reportPreviousExpenses = reportPreviousMonthTransactions
+  .filter((item) => item.type === "expense")
+  .reduce((sum, item) => sum + item.amount, 0);
+
+// Month-to-month changes
+const reportIncomeChange = reportIncome - reportPreviousIncome;
+const reportExpensesChange = reportExpenses - reportPreviousExpenses;
+
+// Expense category breakdown
+const reportCategoryTotals = reportMonthTransactions
+  .filter((item) => item.type === "expense")
+  .reduce<Record<string, number>>((totals, item) => {
+    totals[item.category] =
+      (totals[item.category] ?? 0) + item.amount;
+    return totals;
+  }, {});
+
+const reportCategoryEntries = Object.entries(reportCategoryTotals)
+  .sort((a, b) => b[1] - a[1]);
+
+  
+function exportReportCsv() {
+  const headers = [
+    "Date",
+    "Type",
+    "Description",
+    "Category",
+    "Amount (THB)",
+    "Space",
+    "Notes",
+  ];
+
+  const rows = reportMonthTransactions.map((item) => [
+    item.date,
+    item.type,
+    item.name,
+    item.category,
+    item.amount,
+    item.space,
+    item.notes ?? "",
+  ]);
+
+  const escapeCsvValue = (value: string | number) => {
+    const text = String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+
+  const csvContent = [
+    headers.map(escapeCsvValue).join(","),
+    ...rows.map((row) => row.map(escapeCsvValue).join(",")),
+  ].join("\r\n");
+
+  const blob = new Blob(
+    ["\uFEFF" + csvContent],
+    { type: "text/csv;charset=utf-8;" }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `together-report-${selectedMonth}.csv`;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+}
+
+function exportReportPdf() {
+  const doc = new jsPDF();
+
+  const formatAmount = (amount: number) =>
+    `THB ${amount.toLocaleString("en-US", {
+      maximumFractionDigits: 2,
+    })}`;
+
+  let y = 20;
+
+  // Header
+  doc.setFontSize(20);
+  doc.setTextColor(120, 85, 155);
+  doc.text("Monthly Financial Report", 20, y);
+
+  y += 10;
+  doc.setFontSize(11);
+  doc.setTextColor(100, 100, 100);
+  doc.text(currentMonthLabel, 20, y);
+
+  // Summary
+  y += 15;
+  doc.setFontSize(14);
+  doc.setTextColor(60, 60, 60);
+  doc.text("Financial Summary", 20, y);
+
+  y += 9;
+  doc.setFontSize(11);
+  doc.text(`Total Income: ${formatAmount(reportIncome)}`, 20, y);
+
+  y += 8;
+  doc.text(`Total Expenses: ${formatAmount(reportExpenses)}`, 20, y);
+
+  y += 8;
+  doc.text(`Remaining Balance: ${formatAmount(reportBalance)}`, 20, y);
+
+  // Expense breakdown
+  y += 15;
+  doc.setFontSize(14);
+  doc.text("Expense Breakdown", 20, y);
+
+  y += 9;
+  doc.setFontSize(10);
+
+  if (reportCategoryEntries.length === 0) {
+    doc.text("No expenses recorded this month.", 20, y);
+    y += 8;
+  } else {
+    reportCategoryEntries.forEach(([category, amount]) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+
+      doc.text(category, 20, y);
+      doc.text(formatAmount(amount), 190, y, { align: "right" });
+      y += 8;
+    });
+  }
+
+  // Monthly comparison
+  if (y > 245) {
+    doc.addPage();
+    y = 20;
+  } else {
+    y += 10;
+  }
+
+  doc.setFontSize(14);
+  doc.text("Monthly Comparison", 20, y);
+
+  y += 9;
+  doc.setFontSize(10);
+  doc.text(
+    `Previous month income: ${formatAmount(reportPreviousIncome)}`,
+    20,
+    y
+  );
+
+  y += 8;
+  doc.text(
+    `Previous month expenses: ${formatAmount(reportPreviousExpenses)}`,
+    20,
+    y
+  );
+
+  // Household settlements
+  if (!personal) {
+    const settlementTotal = settlements
+      .filter(
+        (item) =>
+          item.status === "completed" &&
+          item.settled_on?.slice(0, 7) === selectedMonth
+      )
+      .reduce((sum, item) => sum + Number(item.amount), 0);
+
+    y += 15;
+
+    if (y > 270) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.text("Household Settlements", 20, y);
+
+    y += 9;
+    doc.setFontSize(10);
+    doc.text(
+      `Completed repayments: ${formatAmount(settlementTotal)}`,
+      20,
+      y
+    );
+  }
+
+  doc.save(`together-report-${selectedMonth}.pdf`);
+}
 
   function openAdd() {
     setKind("expense");
@@ -1985,17 +2202,254 @@ return (
           )}
 
           {tab === "Reports" && (
-            <section className="panel reports-panel">
-              <span className="section-kicker">YOUR MONTH, AT A GLANCE</span>
-              <h2>{personal ? "My personal report" : "Our household report"}</h2>
-              <p className="welcome-description">Your monthly charts and detailed comparisons will appear here as you add transactions.</p>
-              <div className="empty-chart">
-                <div className="empty-chart-icon">📊</div>
-                <strong>A clearer picture starts with a little data</strong>
-                <span>Category breakdowns, budget progress, and monthly comparisons will live here.</span>
-              </div>
-            </section>
+  <section className="panel reports-panel">
+    <div className="reports-header">
+      <div>
+        <span className="section-kicker">MONTHLY FINANCIAL REPORT</span>
+        <h2>Our Reports</h2>
+        <p className="welcome-description">
+          A clear picture of your money this month.
+        </p>
+      </div>
+      <div className="report-header-icon">📈</div>
+    </div>
+
+    {/* Month selector */}
+    <div className="report-month-selector">
+      <button
+        type="button"
+        onClick={() => {
+          const date = new Date(
+            selectedMonthDate.getFullYear(),
+            selectedMonthDate.getMonth() - 1,
+            1
+          );
+          setComparisonMonth(
+            `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+          );
+        }}
+        aria-label="Previous month"
+      >
+        ‹
+      </button>
+
+      <strong>{currentMonthLabel}</strong>
+
+      <button
+        type="button"
+        onClick={() => {
+          const date = new Date(
+            selectedMonthDate.getFullYear(),
+            selectedMonthDate.getMonth() + 1,
+            1
+          );
+          setComparisonMonth(
+            `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+          );
+        }}
+        aria-label="Next month"
+      >
+        ›
+      </button>
+    </div>
+
+    {/* Summary cards */}
+    <div className="report-summary-grid">
+      <div className="report-summary-card income-card">
+        <span>↗ TOTAL INCOME</span>
+        <strong>{money(reportIncome)}</strong>
+        <small>This month</small>
+      </div>
+
+      <div className="report-summary-card expense-card">
+        <span>↘ TOTAL EXPENSES</span>
+        <strong>{money(reportExpenses)}</strong>
+        <small>This month</small>
+      </div>
+
+      <div className="report-summary-card report-balance-card">
+        <span>REMAINING BALANCE</span>
+        <strong>{money(reportBalance)}</strong>
+        <small>Income minus expenses</small>
+      </div>
+    </div>
+
+    {/* Expense breakdown */}
+    <div className="report-section report-chart-section">
+      <div className="report-section-heading">
+        <h3>Expense breakdown</h3>
+        <span>By category</span>
+      </div>
+
+      {reportCategoryEntries.length === 0 ? (
+        <div className="empty-chart">
+          <strong>No expenses yet</strong>
+          <span>Your category breakdown will appear here.</span>
+        </div>
+      ) : (
+        <div className="report-donut-layout">
+          <div
+            className="report-donut"
+            style={{
+              background: `conic-gradient(${reportCategoryEntries.map(
+                ([, amount], index) => {
+                  const colors = [
+                    "#9670bd",
+                    "#e99ab4",
+                    "#f0b184",
+                    "#a8cdb8",
+                    "#8db9cf",
+                    "#c5a8d9",
+                  ];
+                  const previousTotal = reportCategoryEntries
+                    .slice(0, index)
+                    .reduce((sum, item) => sum + item[1], 0);
+                  const start = reportExpenses > 0
+                    ? (previousTotal / reportExpenses) * 100
+                    : 0;
+                  const end = reportExpenses > 0
+                    ? ((previousTotal + amount) / reportExpenses) * 100
+                    : 0;
+                  return `${colors[index % colors.length]} ${start}% ${end}%`;
+                }
+              ).join(", ")})`,
+            }}
+          >
+            <div className="report-donut-hole" />
+          </div>
+
+          <div className="report-category-legend">
+            {reportCategoryEntries.map(
+              ([category, amount], index) => {
+              const colors = [
+                "#9670bd",
+                "#e99ab4",
+                "#f0b184",
+                "#a8cdb8",
+                "#8db9cf",
+                "#c5a8d9",
+              ];
+
+              return (
+                <div className="report-legend-item" key={category}>
+                  <span
+                    className="report-legend-dot"
+                    style={{ background: colors[index % colors.length] }}
+                  />
+                  <span>{category}</span>
+                  <strong>{money(amount)}</strong>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Monthly comparison */}
+    <div className="report-section">
+      <h3>Monthly comparison</h3>
+      <p className="report-section-description">
+        Compare this month with last month.
+      </p>
+
+      {[
+        {
+          label: "Income",
+          change: reportIncomeChange,
+          current: reportIncome,
+          previous: reportPreviousIncome,
+          color: "#9670bd",
+          track: "#f0e8f8",
+        },
+        {
+          label: "Expenses",
+          change: reportExpensesChange,
+          current: reportExpenses,
+          previous: reportPreviousExpenses,
+          color: "#e28b62",
+          track: "#fff0e9",
+        },
+      ].map((item) => {
+        const max = Math.max(item.current, item.previous, 1);
+        const width = (item.current / max) * 100;
+        const percentage = item.previous > 0
+          ? (item.change / item.previous) * 100
+          : null;
+
+        return (
+          <div className="report-comparison-item" key={item.label}>
+            <div className="report-comparison-top">
+              <span>{item.label}</span>
+              <strong style={{ color: item.color }}>
+                {percentage === null
+                  ? "No previous data"
+                  : `${item.change > 0 ? "↑" : item.change < 0 ? "↓" : "→"} ${Math.abs(percentage).toFixed(1)}%`}
+              </strong>
+            </div>
+            <div
+              className="report-comparison-track"
+              style={{ background: item.track }}
+            >
+              <div
+                className="report-comparison-fill"
+                style={{
+                  width: `${width}%`,
+                  background: item.color,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Household settlements */}
+    {!personal && (
+      <div className="report-section report-settlement-card">
+        <h3>Household settlements</h3>
+        <strong>
+          {money(
+            settlements
+              .filter(
+                (item) =>
+                  item.status === "completed" &&
+                  item.settled_on?.slice(0, 7) === selectedMonth
+              )
+              .reduce((sum, item) => sum + Number(item.amount), 0)
           )}
+        </strong>
+        <p>Repayments recorded this month</p>
+        <small>
+          Shown separately — not counted as income or expenses.
+        </small>
+      </div>
+    )}
+
+    {/* Export cards — we'll connect the real export actions next */}
+    <div className="report-export-grid">
+      <button
+  type="button"
+  className="report-export-card"
+  onClick={exportReportCsv}
+>
+  <span>▦</span>
+  <strong>Export CSV</strong>
+  <small>Transaction details</small>
+</button>
+
+      <button
+  type="button"
+  className="report-export-card"
+  onClick={exportReportPdf}
+>
+  <span>▤</span>
+  <strong>Export PDF</strong>
+  <small>Monthly report</small>
+</button>
+    </div>
+  </section>
+)}
         </div>
       </main>
 
@@ -2036,136 +2490,23 @@ return (
               <button className={space === "personal" ? "selected" : ""} onClick={() => { setSpace("personal"); setTab("My Finance"); }}>🌷 Personal · Private</button>
             </div>
 
-            <form onSubmit={saveTransaction}>
+            <form onSubmit={saveTransaction} className="add-transaction-form">
               <div className="type-switch">
                 <button type="button" className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); setCategory("Food"); }}>− Expense</button>
                 <button type="button" className={kind === "income" ? "selected" : ""} onClick={() => { setKind("income"); setCategory("Salary"); }}>＋ Income</button>
               </div>
 
+              <div className="transaction-amount-section">
+                <label className="form-label" htmlFor="transaction-amount">Amount</label>
+                <div className="amount-input-wrap transaction-amount-wrap">
+                  <span>฿</span>
+                  <input id="transaction-amount" type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required />
+                </div>
+                <span className="amount-currency-caption">THB</span>
+              </div>
+
               <label className="form-label" htmlFor="transaction-name">Transaction name</label>
-              <input id="transaction-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Lunch, salary, groceries" required />
-
-              <label className="form-label" htmlFor="transaction-amount">Amount (THB)</label>
-              <div className="amount-input-wrap"><span>฿</span><input id="transaction-amount" type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required /></div>
-
-{space === "household" && kind === "expense" && (
-  <div className="household-split-fields">
-    <label className="form-label" htmlFor="transaction-payer">
-      Who paid?
-    </label>
-    <select
-      id="transaction-payer"
-      value={paidBy}
-      onChange={(event) => setPaidBy(event.target.value)}
-      required
-    >
-      <option value="">Choose who paid</option>
-      {householdMembers.map((member) => (
-        <option key={member.user_id} value={member.user_id}>
-          {member.display_name}
-        </option>
-      ))}
-    </select>
-
-<label className="form-label" htmlFor="split-method">
-  How should we split it?
-</label>
-
-<select
-  value={splitMethod}
-  onChange={(event) =>
-    setSplitMethod(
-      event.target.value as
-        | "equal"
-        | "custom"
-        | "percentage"
-        | "shares"
-        | "adjustment"
-    )
-  }
->
-  <option value="equal">Split equally</option>
-  <option value="custom">Split by exact amounts</option>
-  <option value="percentage">Split by percentages</option>
-  <option value="shares">Split by shares</option>
-  <option value="adjustment">Split by adjustment</option>
-</select>
-
-    
-{splitMethod === "equal" ? (
-  <p className="form-hint">
-    The expense will be divided equally between all household members.
-  </p>
-) : (
-  <>
-    <label className="form-label">
-      {splitMethod === "custom"
-        ? "Each person's share (THB)"
-        : splitMethod === "percentage"
-          ? "Each person's percentage (%)"
-          : splitMethod === "shares"
-            ? "Share units for each person"
-            : "Adjustment for each person (THB)"}
-    </label>
-
-    {householdMembers.map((member) => (
-      <div key={member.user_id}>
-        <label
-          className="form-label"
-          htmlFor={`share-${member.user_id}`}
-        >
-          {member.display_name}
-        </label>
-
-        <div className="amount-input-wrap">
-          <span>
-            {splitMethod === "percentage"
-              ? "%"
-              : splitMethod === "shares"
-                ? "×"
-                : "฿"}
-          </span>
-
-          <input
-            id={`share-${member.user_id}`}
-            type="number"
-            min={splitMethod === "adjustment" ? undefined : "0"}
-            max={splitMethod === "percentage" ? "100" : undefined}
-            step="0.01"
-            value={shareAmounts[member.user_id] ?? ""}
-            onChange={(event) =>
-              setShareAmounts((current) => ({
-                ...current,
-                [member.user_id]: event.target.value,
-              }))
-            }
-            placeholder={
-              splitMethod === "percentage"
-                ? "50"
-                : splitMethod === "shares"
-                  ? "1"
-                  : "0.00"
-            }
-            required
-          />
-        </div>
-      </div>
-    ))}
-
-    <p className="form-hint">
-      {splitMethod === "custom"
-        ? "All amounts must add up to the total expense."
-        : splitMethod === "percentage"
-          ? "All percentages must add up to 100%."
-          : splitMethod === "shares"
-            ? "Enter each person's share units. The expense will be divided proportionally."
-            : "Start with an equal split. Positive adjustments increase a person's share; negative adjustments decrease it. All adjustments must add up to ฿0."}
-    </p>
-  </>
-)}
-  </div>
-)}
-
+              <input id="transaction-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="What was this for?" required />
 
               <label className="form-label" htmlFor="transaction-category">Category</label>
               <select id="transaction-category" value={category} onChange={(event) => setCategory(event.target.value)}>
@@ -2175,29 +2516,96 @@ return (
                 ).map((item) => <option key={item}>{item}</option>)}
               </select>
 
-              <details className="optional-details">
-                <summary>＋ Optional details</summary>
-                <label className="form-label" htmlFor="transaction-note">Note</label>
-                <textarea id="transaction-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add a little note..." rows={2} />
-                <p className="form-hint">Dates and receipt uploads will be added in a later step.</p>
-              </details>
-{saveError && (
-  <p className="auth-error" role="alert">{saveError}</p>
-)}
+              {space === "household" && kind === "expense" && (
+                <section className="household-split-fields add-split-card" aria-label="Household expense split">
+                  <div className="split-card-heading">
+                    <span className="split-card-icon">♡</span>
+                    <div>
+                      <strong>Split this expense</strong>
+                      <p>Choose who paid and how to share it</p>
+                    </div>
+                  </div>
 
-<button
-  className="primary-button save-button"
-  type="submit"
-  disabled={saving}
->
-  {saving ? "Saving..." : "Save transaction ♡"}
-</button>
-              
+                  <label className="form-label" htmlFor="transaction-payer">Paid by</label>
+                  <select id="transaction-payer" value={paidBy} onChange={(event) => setPaidBy(event.target.value)} required>
+                    <option value="">Choose who paid</option>
+                    {householdMembers.map((member) => (
+                      <option key={member.user_id} value={member.user_id}>{member.display_name}</option>
+                    ))}
+                  </select>
+
+                  <label className="form-label" htmlFor="split-method">Split method</label>
+                  <div className="split-method-options" role="group" aria-label="Split method">
+                    <button type="button" className={splitMethod === "equal" ? "selected" : ""} onClick={() => setSplitMethod("equal")}>Equal</button>
+                    <button type="button" className={splitMethod === "percentage" ? "selected" : ""} onClick={() => setSplitMethod("percentage")}>Percentage</button>
+                    <button type="button" className={splitMethod === "custom" ? "selected" : ""} onClick={() => setSplitMethod("custom")}>Custom amount</button>
+                  </div>
+
+                  {splitMethod !== "equal" && (
+                    <div className="split-input-list">
+                      <p className="split-input-caption">{splitMethod === "percentage" ? "Enter each person's percentage" : "Enter each person's share"}</p>
+                      {householdMembers.map((member) => (
+                        <div className="split-input-row" key={member.user_id}>
+                          <label htmlFor={`share-${member.user_id}`}>{member.display_name}</label>
+                          <div className="split-value-input">
+                            <input
+                              id={`share-${member.user_id}`}
+                              type="number"
+                              min="0"
+                              max={splitMethod === "percentage" ? "100" : undefined}
+                              step="0.01"
+                              value={shareAmounts[member.user_id] ?? ""}
+                              onChange={(event) => setShareAmounts((current) => ({ ...current, [member.user_id]: event.target.value }))}
+                              placeholder="0"
+                              required
+                            />
+                            <span>{splitMethod === "percentage" ? "%" : "฿"}</span>
+                          </div>
+                        </div>
+                      ))}
+                      <p className="form-hint">
+                        {splitMethod === "custom" ? "All shares must add up to the total expense." : "All percentages must add up to 100%."}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="share-summary-card">
+                    <div className="share-summary-title">Share summary</div>
+                    {householdMembers.length === 0 ? (
+                      <p className="form-hint">No household members found.</p>
+                    ) : householdMembers.map((member, index) => {
+                      const total = Number(amount) || 0;
+                      const raw = Number(shareAmounts[member.user_id] ?? 0);
+                      const shareValue = splitMethod === "equal"
+                        ? (householdMembers.length ? Math.floor(Math.round(total * 100) / householdMembers.length + (index < Math.round(total * 100) % householdMembers.length ? 1 : 0)) / 100 : 0)
+                        : splitMethod === "percentage" ? total * raw / 100 : raw;
+                      return (
+                        <div className="share-summary-row" key={member.user_id}>
+                          <span>{member.display_name}{member.user_id === paidBy ? " · paid" : ""}</span>
+                          <strong>฿{shareValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              <details className="optional-details">
+                <summary>＋ Additional details</summary>
+                <label className="form-label" htmlFor="transaction-note">Note</label>
+                <textarea id="transaction-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add a note..." rows={2} />
+                <p className="form-hint">The transaction date is set automatically.</p>
+              </details>
+
+              {saveError && <p className="auth-error" role="alert">{saveError}</p>}
+
+              <button className="primary-button save-button" type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save ♡"}
+              </button>
+
               <p className="privacy-note">
-  🔒 {space === "personal"
-    ? "Private transactions are saved to your account."
-    : "Household transactions are shared with household members."}
-</p>
+                🔒 {space === "personal" ? "Private transactions are saved to your account." : "Household transactions are shared with household members."}
+              </p>
             </form>
           </section>
         </div>
