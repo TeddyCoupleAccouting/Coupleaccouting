@@ -2603,7 +2603,7 @@ body {
 }
 
 
-/* My Profile — Couple Finance */
+/* My Profile â€” Couple Finance */
 .settings-page .profile-details {
   display: flex;
   flex-direction: column;
@@ -3177,7 +3177,7 @@ body {
     gap: 8px;
   }
 }
-/* REPORTS — reference design */
+/* REPORTS â€” reference design */
 
 .reports-panel {
   gap: 22px;
@@ -3475,7 +3475,7 @@ body {
   }
 }
 
-/* MOBILE RESPONSIVE FIX — TRANSACTIONS AND FILTERS */
+/* MOBILE RESPONSIVE FIX â€” TRANSACTIONS AND FILTERS */
 @media (max-width: 760px) {
   .page-content,
   .main-content,
@@ -3570,7 +3570,7 @@ body {
 
 
 /* =================================
-   ADD TRANSACTION — IPHONE LAYOUT
+   ADD TRANSACTION â€” IPHONE LAYOUT
    Stage 1
 ================================= */
 
@@ -3669,7 +3669,7 @@ body {
 }
 
 
-/* Add Transaction refresh — iPhone-first form hierarchy */
+/* Add Transaction refresh â€” iPhone-first form hierarchy */
 .add-transaction-form {
   gap: 0;
 }
@@ -4279,305 +4279,4 @@ body {
   .mobile-brand .brand-household-name { max-width:34vw; font-size:15px; }
   .topbar-household-select { max-width:125px; font-size:11px; padding:0 6px; }
   .mobile-bottom-nav-item { font-size:9px; }
-}
-
-
-/* iPhone dashboard spacing refinement — desktop styles are untouched */
-@media (max-width: 760px) {
-  .topbar {
-    min-height: 70px;
-    padding: 15px 16px;
-  }
-
-  .page-content {
-    padding: 27px 14px calc(28px + env(safe-area-inset-bottom));
-  }
-
-  .welcome-row {
-    margin-bottom: 15px;
-  }
-
-  .welcome-row h1 {
-    margin-top: 8px;
-    margin-bottom: 6px;
-    font-size: clamp(25px, 6.2vw, 29px);
-    line-height: 1.16;
-  }
-
-  .welcome-description {
-    line-height: 1.55;
-  }
-
-  .space-switcher {
-    gap: 7px;
-    margin-bottom: 15px;
-  }
-
-  .space-switcher button {
-    min-height: 42px;
-    padding: 9px 8px;
-  }
-
-  .couple-banner,
-  .personal-hero {
-    min-height: 0;
-    margin-bottom: 15px;
-    padding: 20px 16px;
-    border-radius: 18px;
-  }
-
-  .banner-kicker {
-    font-size: 9px;
-    letter-spacing: 1.15px;
-    line-height: 1.4;
-  }
-
-  .couple-copy h2,
-  .personal-hero h2 {
-    margin: 8px 0 6px;
-    font-size: 19px;
-    line-height: 1.25;
-  }
-
-  .couple-copy p,
-  .personal-hero p {
-    font-size: 11px;
-    line-height: 1.55;
-  }
-
-  .balance-card {
-    margin-bottom: 15px;
-    padding: 18px 17px;
-    border-radius: 17px;
-  }
-
-  .summary-grid {
-    gap: 9px;
-    margin-bottom: 15px;
-  }
-
-  .summary-card {
-    padding: 14px 15px;
-  }
-
-  .content-grid {
-    gap: 12px;
-  }
-
-  .panel {
-    padding: 16px 14px;
-  }
-
-  /* Keep the fixed navigation clear of the final dashboard card */
-  .app {
-    padding-bottom: calc(82px + env(safe-area-inset-bottom));
-  }
-}
-
-@media (max-width: 390px) {
-  .topbar {
-    padding-right: 13px;
-    padding-left: 13px;
-  }
-
-  .page-content {
-    padding-top: 24px;
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
-  .welcome-row h1 {
-    font-size: 25px;
-  }
-
-  .space-switcher button {
-    font-size: 10px;
-  }
-
-  .couple-banner,
-  .personal-hero {
-    padding: 18px 14px;
-  }
-
-  .balance-card {
-    padding: 16px 14px;
-  }
-}
-
-
-
-/* iPhone dashboard cards: compact two-column layout inspired by the reference.
-   These overrides are phone-only; tablet and desktop layouts stay unchanged. */
-@media (max-width: 600px) {
-  /* Keep the balance card as the main full-width feature. */
-  .balance-card {
-    width: 100%;
-    margin-bottom: 14px;
-  }
-
-  /* Monthly figures become a tidy two-column card layout. */
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .summary-card {
-    min-width: 0;
-    padding: 14px 12px;
-    border-radius: 16px;
-  }
-
-  .summary-card:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .summary-top {
-    gap: 5px;
-    margin-bottom: 10px;
-  }
-
-  .summary-icon {
-    width: 31px;
-    height: 31px;
-    border-radius: 10px;
-    font-size: 17px;
-  }
-
-  .summary-caption {
-    font-size: 8px;
-    letter-spacing: .45px;
-  }
-
-  .summary-card > p {
-    font-size: 11px;
-    line-height: 1.35;
-  }
-
-  .summary-card h3 {
-    font-size: clamp(18px, 5vw, 23px);
-    letter-spacing: -.5px;
-  }
-
-  .summary-foot {
-    margin-top: 5px;
-    font-size: 9px;
-    line-height: 1.35;
-  }
-
-  /* Overview panels sit side by side, like the reference cards. */
-  .content-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .content-grid > .panel {
-    min-width: 0;
-    padding: 13px 11px;
-    border-radius: 16px;
-  }
-
-  .content-grid .panel-heading {
-    align-items: flex-start;
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-
-  .content-grid .panel-heading h2 {
-    font-size: 14px;
-    line-height: 1.25;
-  }
-
-  .content-grid .section-kicker {
-    font-size: 8px;
-    letter-spacing: .8px;
-  }
-
-  .content-grid .subtle-button {
-    flex: 0 0 auto;
-    padding: 4px 0;
-    font-size: 9px;
-    white-space: nowrap;
-  }
-
-  .category-breakdown {
-    gap: 12px;
-    padding: 3px 0;
-  }
-
-  .category-row-top {
-    align-items: flex-start;
-    gap: 5px;
-    font-size: 10px;
-    line-height: 1.35;
-  }
-
-  .category-row-top strong {
-    font-size: 10px;
-  }
-
-  .category-bar {
-    height: 5px;
-  }
-
-  .content-grid .transaction-row {
-    align-items: flex-start;
-    gap: 7px;
-    padding: 10px 0;
-  }
-
-  .content-grid .transaction-icon {
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
-    border-radius: 9px;
-    font-size: 14px;
-  }
-
-  .content-grid .transaction-details,
-  .content-grid .transaction-info,
-  .content-grid .transaction-main {
-    min-width: 0;
-  }
-
-  .content-grid .transaction-row strong,
-  .content-grid .transaction-row p,
-  .content-grid .transaction-row small,
-  .content-grid .transaction-row span {
-    overflow-wrap: anywhere;
-    font-size: 9px;
-    line-height: 1.35;
-  }
-
-  .content-grid .empty-chart {
-    min-height: 125px;
-    gap: 6px;
-    padding: 12px 8px;
-  }
-
-  .content-grid .empty-chart-icon {
-    font-size: 23px;
-  }
-
-  .content-grid .empty-chart strong {
-    font-size: 10px;
-  }
-
-  .content-grid .empty-chart > span {
-    font-size: 9px;
-    line-height: 1.45;
-  }
-
-  .repayment-panel {
-    margin-top: 14px;
-    padding: 15px;
-  }
-}
-
-/* Very narrow iPhones: preserve two columns without cramped text. */
-@media (max-width: 360px) {
-  .content-grid {
-    grid-template-columns: 1fr;
-  }
 }

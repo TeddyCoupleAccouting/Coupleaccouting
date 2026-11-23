@@ -1749,10 +1749,10 @@ return (
               >
                 <span className="nav-icon">
               {({
-                  Home: "⌂",
-                  Activity: "◷",
-                  Reports: "▤",
-                  "My Finance": "♡",
+                  Home: "🏠",
+                  Activity: "🕒",
+                  Reports: "📊",
+                  "My Finance": "💜",
                   Settings: "⚙️",
                 } as Record<Tab, string>)[item]}
           </span>
@@ -1793,7 +1793,7 @@ return (
             onClick={() => changeTab(item)}
           >
             <span className="mobile-bottom-nav-icon">
-              {({ Home: "⌂", Activity: "◷", Reports: "▤", "My Finance": "♡", Settings: "⚙️" } as Record<Tab, string>)[item]}
+              {({ Home: "🏠", Activity: "🕒", Reports: "📊", "My Finance": "💜", Settings: "⚙️" } as Record<Tab, string>)[item]}
             </span>
             <span>{item === "My Finance" ? "My Finance" : item}</span>
           </button>
@@ -1861,7 +1861,7 @@ return (
             <>
               <section className="couple-banner">
                 <div className="couple-copy">
-                  <span className="banner-kicker">OUR LITTLE MONEY CHECK-IN</span>
+                  <span className="banner-kicker">OUR LITTLE MONEY</span>
                   <h2>Teamwork looks good on you. 💕</h2>
                   <p>Every small step helps build the life you want together.</p>
                 </div>
@@ -2275,9 +2275,9 @@ return (
               <aside className="settings-nav-panel">
                 <h1>Settings</h1>
                 <nav aria-label="Settings sections">
-                  <button type="button" className={settingsSection === "profile" ? "active" : ""} onClick={() => setSettingsSection("profile")}><span className="settings-nav-icon">♙</span><span><strong>My Profile</strong><small>Account, email and security</small></span><b>›</b></button>
-                  <button type="button" className={settingsSection === "households" ? "active" : ""} onClick={() => setSettingsSection("households")}><span className="settings-nav-icon">⌂</span><span><strong>Household Management</strong><small>Manage your households, members and settings</small></span><b>›</b></button>
-                  <button type="button" className={settingsSection === "personal" ? "active" : ""} onClick={() => setSettingsSection("personal")}><span className="settings-nav-icon">▣</span><span><strong>Personal Finance</strong><small>Your private money space</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "profile" ? "active" : ""} onClick={() => setSettingsSection("profile")}><span className="settings-nav-icon">⚙️</span><span><strong>My Profile</strong><small>Account, email and security</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "households" ? "active" : ""} onClick={() => setSettingsSection("households")}><span className="settings-nav-icon">🏡</span><span><strong>Household Management</strong><small>Manage your households, members and settings</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "personal" ? "active" : ""} onClick={() => setSettingsSection("personal")}><span className="settings-nav-icon">👤</span><span><strong>Personal Finance</strong><small>Your private money space</small></span><b>›</b></button>
                 </nav>
               </aside>
               <div className="settings-detail-area">
@@ -2358,7 +2358,7 @@ return (
                       <span className="household-active-pill">Active</span>
                     </div>
                     <div className="household-tabs">
-                      {([["general","⚙","General"],["members","♧","Members"],["invitations","✉","Invitations"],["permissions","♢","Permissions"]] as const).map(([key, icon, label]) => (
+                      {([["general","⚙️","General"],["members","👥","Members"],["invitations","✉️","Invitations"],["permissions","🛡️","Permissions"]] as const).map(([key, icon, label]) => (
                         <button type="button" key={key} className={householdSettingsTab === key ? "selected" : ""} onClick={() => setHouseholdSettingsTab(key)}><span>{icon}</span>{label}</button>
                       ))}
                     </div>
@@ -2885,10 +2885,10 @@ return (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => changeTab(item)}>
             <span>
         {{
-               Home: "⌂",
-               Activity: "◷",
-               Reports: "▤",
-               "My Finance": "♡",
+               Home: "🏠",
+               Activity: "🕒",
+               Reports: "📊",
+               "My Finance": "💜",
                Settings: "⚙️",
          }[item]}
 </span>
