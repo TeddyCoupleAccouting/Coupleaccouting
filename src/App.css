@@ -813,8 +813,7 @@ body {
   font-size: 21px;
 }
 
-.mobile-brand,
-.mobile-nav {
+.mobile-brand {
   display: none;
 }
 
@@ -2002,53 +2001,6 @@ body {
     padding: 19px;
   }
 
-  .mobile-nav {
-    position: fixed;
-    z-index: 100;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    justify-content: space-around;
-    gap: 3px;
-    padding: 8px 8px max(8px, env(safe-area-inset-bottom));
-    border-top: 1px solid #eee5f3;
-    background: #ffffffed;
-    backdrop-filter: blur(12px);
-  }
-
-  .mobile-nav button {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    padding: 5px 2px;
-    border: none;
-    border-radius: 10px;
-    background: transparent;
-    color: #92879e;
-  }
-
-  .mobile-nav button > span {
-    font-size: 20px;
-    line-height: 1.2;
-  }
-
-  .mobile-nav button small {
-    font-size: 9px;
-  }
-
-  .mobile-nav button.active {
-    background: #f2eafa;
-    color: #76529e;
-  }
-
-  .personal-theme .mobile-nav button.active {
-    background: #fff0f4;
-    color: #bd6b89;
-  }
 
   .floating-add {
     position: fixed;

@@ -2880,22 +2880,6 @@ return (
         </div>
       </main>
 
-      <nav className="mobile-nav">
-        {(["Home", "Activity", "Reports", "My Finance"] as Tab[]).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => changeTab(item)}>
-            <span>
-        {{
-               Home: "🏠",
-               Activity: "🕒",
-               Reports: "📊",
-               "My Finance": "💜",
-               Settings: "⚙️",
-         }[item]}
-</span>
-            <small>{item}</small>
-          </button>
-        ))}
-      </nav>
 
       <button className="floating-add" onClick={openAdd} aria-label="Add transaction">＋</button>
 
