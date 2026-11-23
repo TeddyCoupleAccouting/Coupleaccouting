@@ -29,6 +29,45 @@ balanceMessage?: string;
 type HouseholdMember = {
   user_id: string;
   display_name: string;
+  avatar?: string | null;
+  role?: string;
+};
+
+type HouseholdRecord = {
+  id: string;
+  name: string;
+  currency: string;
+  icon: string | null;
+  role: string;
+  memberCount: number;
+};
+
+const householdIconDisplay = (icon: string | null | undefined) => {
+  const iconMap: Record<string, string> = {
+    "house-heart": "🏡",
+    "home": "🏠",
+    "heart": "💗",
+    "sprout": "🌱",
+    "coffee": "☕",
+    "paw-print": "🐾",
+    "briefcase": "🧳",
+    "building": "🏢",
+  };
+  if (!icon) return "🏡";
+  return iconMap[icon] ?? (icon.length > 4 ? "🏡" : icon);
+};
+
+type CategoryRecord = {
+  id: string;
+  household_id: string | null;
+  name: string;
+  kind: TransactionType;
+  is_default: boolean;
+  created_by: string;
+  parent_id: string | null;
+  icon: string | null;
+  is_active: boolean;
+  sort_order: number;
 };
 
 
@@ -45,9 +84,98 @@ export default function App() {
 
 const [showAllRepayments, setShowAllRepayments] = useState(false);
 const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
+const [households, setHouseholds] = useState<HouseholdRecord[]>([]);
+const [activeHouseholdId, setActiveHouseholdId] = useState<string | null>(null);
+const [householdSettingsTab, setHouseholdSettingsTab] = useState<"general" | "members" | "invitations" | "permissions">("general");
+const [settingsSection, setSettingsSection] = useState<"profile" | "households" | "personal" | "preferences">("profile");
+const [householdNameDraft, setHouseholdNameDraft] = useState("");
+const [householdIconDraft, setHouseholdIconDraft] = useState("🏡");
+const [householdMessage, setHouseholdMessage] = useState("");
+const [householdSaving, setHouseholdSaving] = useState(false);
+const [memberEditId, setMemberEditId] = useState<string | null>(null);
+const [memberNameDraft, setMemberNameDraft] = useState("");
+const [memberAvatarDraft, setMemberAvatarDraft] = useState("🐻");
+const [inviteEmail, setInviteEmail] = useState("");
+const [inviteMessage, setInviteMessage] = useState("");
+const [showCreateHousehold, setShowCreateHousehold] = useState(false);
+const [newHouseholdName, setNewHouseholdName] = useState("");
 const [session, setSession] = useState<Session | null>(null);
 const [displayName, setDisplayName] = useState("");
 const [profileMessage, setProfileMessage] = useState("");
+const [categories, setCategories] = useState<CategoryRecord[]>([]);
+const [categoryKindTab, setCategoryKindTab] = useState<TransactionType>("expense");
+const [categoryFormName, setCategoryFormName] = useState("");
+const [categoryFormIcon, setCategoryFormIcon] = useState("📁");
+const [categoryFormParentId, setCategoryFormParentId] = useState("");
+const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+const [categoryMessage, setCategoryMessage] = useState("");
+const [categorySaving, setCategorySaving] = useState(false);
+const [categoryLoading, setCategoryLoading] = useState(false);
+const [categoryHouseholdId, setCategoryHouseholdId] = useState<string | null>(null);
+const [expandedCategoryIds, setExpandedCategoryIds] = useState<string[]>([]);
+const [openCategoryMenuId, setOpenCategoryMenuId] = useState<string | null>(null);
+const [showCategoryEditor, setShowCategoryEditor] = useState(false);
+
+
+  useEffect(() => {
+    if (!session?.user) {
+      setHouseholds([]);
+      setActiveHouseholdId(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadHouseholds() {
+      const { data: memberships, error } = await supabase
+        .from("household_members")
+        .select("household_id, role")
+        .eq("user_id", session!.user.id);
+      if (error) {
+        console.error("Failed to load households:", error.message);
+        return;
+      }
+      const ids = (memberships ?? []).map((row) => row.household_id);
+      if (!ids.length) {
+        if (!cancelled) { setHouseholds([]); setActiveHouseholdId(null); }
+        return;
+      }
+      const { data: rows, error: householdError } = await supabase
+        .from("households")
+        .select("id, name, currency, icon")
+        .in("id", ids)
+        .order("created_at", { ascending: true });
+      if (householdError) {
+        console.error("Failed to load household details:", householdError.message);
+        return;
+      }
+      const roleById = new Map((memberships ?? []).map((row) => [row.household_id, row.role]));
+      const { data: memberRows } = await supabase
+        .from("household_members")
+        .select("household_id, user_id")
+        .in("household_id", ids);
+      const countById = new Map<string, number>();
+      (memberRows ?? []).forEach((row) => countById.set(row.household_id, (countById.get(row.household_id) ?? 0) + 1));
+      const loaded = (rows ?? []).map((row) => ({
+        ...row,
+        icon: row.icon ?? "🏡",
+        role: roleById.get(row.id) ?? "member",
+        memberCount: countById.get(row.id) ?? 0,
+      })) as HouseholdRecord[];
+      if (!cancelled) {
+        setHouseholds(loaded);
+        setActiveHouseholdId((current) => current && loaded.some((h) => h.id === current) ? current : loaded[0]?.id ?? null);
+      }
+    }
+    void loadHouseholds();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  useEffect(() => {
+    const active = households.find((item) => item.id === activeHouseholdId);
+    if (active) {
+      setHouseholdNameDraft(active.name);
+      setHouseholdIconDraft(householdIconDisplay(active.icon));
+    }
+  }, [activeHouseholdId, households]);
 
     useEffect(() => {
     if (!session) {
@@ -58,24 +186,13 @@ const [profileMessage, setProfileMessage] = useState("");
     let cancelled = false;
 
     async function loadHouseholdMembers() {
-      const { data: membership, error: membershipError } = await supabase
-        .from("household_members")
-        .select("household_id")
-        .eq("user_id", session!.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (membershipError || !membership) {
-        if (membershipError) {
-          console.error("Failed to load household:", membershipError.message);
-        }
-        return;
-      }
+      if (!activeHouseholdId) return;
+      const householdId = activeHouseholdId;
 
       const { data: members, error: membersError } = await supabase
         .from("household_members")
-        .select("user_id")
-        .eq("household_id", membership.household_id);
+        .select("user_id, display_name, avatar, role")
+        .eq("household_id", householdId);
 
       if (membersError) {
         console.error("Failed to load members:", membersError.message);
@@ -105,10 +222,15 @@ const [profileMessage, setProfileMessage] = useState("");
         ])
       );
 
-      const loadedMembers = userIds.map((userId) => ({
-        user_id: userId,
-        display_name: names.get(userId) || "Household member",
-      }));
+      const loadedMembers = userIds.map((userId) => {
+        const row = (members ?? []).find((member) => member.user_id === userId);
+        return {
+          user_id: userId,
+          display_name: row?.display_name || names.get(userId) || "Household member",
+          avatar: row?.avatar || null,
+          role: row?.role || "member",
+        };
+      });
 
       if (!cancelled) {
         setHouseholdMembers(loadedMembers);
@@ -120,7 +242,7 @@ const [profileMessage, setProfileMessage] = useState("");
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, activeHouseholdId]);
 
   useEffect(() => {
   supabase.auth.getSession().then(({ data, error }) => {
@@ -141,6 +263,207 @@ const [profileMessage, setProfileMessage] = useState("");
     return () => subscription.unsubscribe();
 }, []);
 
+
+  useEffect(() => {
+    const firstParent = categories.find((item) => item.kind === categoryKindTab && item.parent_id === null);
+    setExpandedCategoryIds(firstParent ? [firstParent.id] : []);
+  }, [categoryKindTab, categories]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategories() {
+      if (!session?.user) {
+        setCategories([]);
+        setCategoryHouseholdId(null);
+        return;
+      }
+
+      setCategoryLoading(true);
+      const householdId = activeHouseholdId;
+      if (!householdId) {
+        console.error("No active household is selected for categories.");
+        if (!cancelled) {
+          setCategoryMessage("Couldn't find your household. Please refresh and try again.");
+          setCategoryLoading(false);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, household_id, name, kind, is_default, created_by, parent_id, icon, is_active, sort_order")
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("Failed to load categories:", error.message);
+        if (!cancelled) setCategoryMessage("Couldn't load categories. Please refresh and try again.");
+      } else if (!cancelled) {
+        setCategoryHouseholdId(householdId);
+        setCategoryMessage("");
+        setCategories((data ?? []) as CategoryRecord[]);
+      }
+
+      if (!cancelled) setCategoryLoading(false);
+    }
+
+    void loadCategories();
+    return () => { cancelled = true; };
+  }, [session, activeHouseholdId]);
+
+  function resetCategoryForm() {
+    setCategoryFormName("");
+    setCategoryFormIcon("📁");
+    setCategoryFormParentId("");
+    setEditingCategoryId(null);
+    setCategoryMessage("");
+    setShowCategoryEditor(false);
+  }
+
+  function startEditCategory(item: CategoryRecord) {
+    setEditingCategoryId(item.id);
+    setCategoryFormName(item.name);
+    setCategoryFormIcon(item.icon || "📁");
+    setCategoryFormParentId(item.parent_id || "");
+    setCategoryMessage("");
+    setCategoryKindTab(item.kind);
+    setShowCategoryEditor(true);
+    setOpenCategoryMenuId(null);
+  }
+
+  async function saveCategory(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.user || !categoryHouseholdId) {
+      setCategoryMessage("Please sign in and make sure you are in a household.");
+      return;
+    }
+    const trimmedName = categoryFormName.trim();
+    if (!trimmedName) {
+      setCategoryMessage("Please enter a category name.");
+      return;
+    }
+    if (categoryFormParentId === editingCategoryId) {
+      setCategoryMessage("A category cannot be its own parent.");
+      return;
+    }
+
+    setCategorySaving(true);
+    setCategoryMessage("");
+    const payload = {
+      name: trimmedName,
+      icon: categoryFormIcon.trim() || "📁",
+      parent_id: categoryFormParentId || null,
+    };
+
+    const result = editingCategoryId
+      ? await supabase.from("categories").update(payload).eq("id", editingCategoryId)
+      : await supabase.from("categories").insert({
+          ...payload,
+          household_id: categoryHouseholdId,
+          kind: categoryKindTab,
+          created_by: session.user.id,
+          is_default: false,
+          is_active: true,
+          sort_order: categories.filter((item) => item.kind === categoryKindTab && item.parent_id === (categoryFormParentId || null)).length,
+        });
+
+    if (result.error) {
+      console.error("Failed to save category:", result.error.message);
+      setCategoryMessage(`Couldn't save category: ${result.error.message}`);
+    } else {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, household_id, name, kind, is_default, created_by, parent_id, icon, is_active, sort_order")
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+      if (!error) setCategories((data ?? []) as CategoryRecord[]);
+      resetCategoryForm();
+      setCategoryMessage("Category saved successfully.");
+    }
+    setCategorySaving(false);
+  }
+
+  async function toggleCategoryActive(item: CategoryRecord) {
+    const { error } = await supabase
+      .from("categories")
+      .update({ is_active: !item.is_active })
+      .eq("id", item.id);
+    if (error) {
+      console.error("Failed to update category status:", error.message);
+      setCategoryMessage("Couldn't update this category. Please try again.");
+      return;
+    }
+    setCategories((current) => current.map((category) =>
+      category.id === item.id ? { ...category, is_active: !item.is_active } : category
+    ));
+    setCategoryMessage(item.is_active ? "Category hidden from new entries." : "Category activated.");
+  }
+
+async function saveHouseholdDetails() {
+  if (!activeHouseholdId || !householdNameDraft.trim()) {
+    setHouseholdMessage("Please enter a household name.");
+    return;
+  }
+  setHouseholdSaving(true);
+  const { error } = await supabase.from("households")
+    .update({ name: householdNameDraft.trim(), icon: householdIconDraft })
+    .eq("id", activeHouseholdId);
+  if (error) setHouseholdMessage(`Couldn't save household: ${error.message}`);
+  else {
+    setHouseholds((current) => current.map((h) => h.id === activeHouseholdId ? { ...h, name: householdNameDraft.trim(), icon: householdIconDraft } : h));
+    setHouseholdMessage("Household updated successfully.");
+  }
+  setHouseholdSaving(false);
+}
+
+async function createHousehold() {
+  if (!session?.user || !newHouseholdName.trim()) return;
+  setHouseholdSaving(true);
+  const { data: created, error } = await supabase.from("households")
+    .insert({ name: newHouseholdName.trim(), currency: "THB", created_by: session.user.id, icon: "🏡" })
+    .select("id, name, currency, icon")
+    .single();
+  if (error) {
+    setHouseholdMessage(`Couldn't create household: ${error.message}`);
+    setHouseholdSaving(false);
+    return;
+  }
+  // The existing add_household_creator trigger creates the owner's membership.
+  setHouseholds((current) => [...current, { ...created, icon: created.icon ?? "🏡", role: "owner", memberCount: 1 }]);
+  setActiveHouseholdId(created.id);
+  setNewHouseholdName("");
+  setShowCreateHousehold(false);
+  setHouseholdMessage("Your new household is ready!");
+  setHouseholdSaving(false);
+}
+
+async function saveMemberIdentity(memberId: string) {
+  if (!activeHouseholdId || !memberNameDraft.trim()) return;
+  const { error } = await supabase.from("household_members")
+    .update({ display_name: memberNameDraft.trim(), avatar: memberAvatarDraft })
+    .eq("household_id", activeHouseholdId)
+    .eq("user_id", memberId);
+  if (error) {
+    setHouseholdMessage(`Couldn't update member: ${error.message}`);
+    return;
+  }
+  setHouseholdMembers((current) => current.map((m) => m.user_id === memberId ? { ...m, display_name: memberNameDraft.trim(), avatar: memberAvatarDraft } : m));
+  setMemberEditId(null);
+  setHouseholdMessage("Member details updated.");
+}
+
+async function createHouseholdInvitation() {
+  if (!activeHouseholdId || !inviteEmail.trim()) return;
+  const { error } = await supabase.from("household_invitations").insert({
+    household_id: activeHouseholdId,
+    email: inviteEmail.trim().toLowerCase(),
+    invited_by: session!.user.id,
+    role: "member",
+  });
+  setInviteMessage(error ? `Couldn't create invitation: ${error.message}` : "Invitation created. Email delivery still needs to be connected.");
+  if (!error) setInviteEmail("");
+}
 
 async function handleSaveProfile() {
   if (!session?.user) {
@@ -167,6 +490,11 @@ async function handleSaveProfile() {
   }
 
   setDisplayName(trimmedName);
+  setHouseholdMembers((current) => current.map((member) =>
+    member.user_id === session.user.id
+      ? { ...member, display_name: trimmedName }
+      : member
+  ));
   setProfileMessage("Profile saved successfully!");
 }
 
@@ -275,7 +603,7 @@ const [activityEndDate, setActivityEndDate] = useState("");
   const [kind, setKind] = useState<TransactionType>("expense");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("Food");
+  const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [paidBy, setPaidBy] = useState("");
   const [shareAmounts, setShareAmounts] = useState<Record<string, string>>({});
@@ -296,8 +624,9 @@ const [activityEndDate, setActivityEndDate] = useState("");
       const { data, error } = await supabase
         .from("transactions")
         .select(
-      "id, scope, kind, amount, description, occurred_on, category_id, paid_by, split_method, notes"
+      "id, household_id, created_by, scope, kind, amount, description, occurred_on, category_id, paid_by, split_method, notes"
 )
+        .or(`household_id.eq.${activeHouseholdId ?? "00000000-0000-0000-0000-000000000000"},and(scope.eq.private,created_by.eq.${session.user.id})`)
         .order("occurred_on", { ascending: false });
 
       if (error) {
@@ -343,22 +672,13 @@ if (splitsError) {
 
 let loadedSettlements: Settlement[] = [];
 
-const { data: membership, error: membershipError } = await supabase
-  .from("household_members")
-  .select("household_id")
-  .eq("user_id", session.user.id)
-  .limit(1)
-  .maybeSingle();
-
-if (membershipError) {
-  console.error("Failed to load household membership:", membershipError.message);
-} else if (membership?.household_id) {
+if (activeHouseholdId) {
   const { data: settlementData, error: settlementError } = await supabase
     .from("settlements")
     .select(
       "id, household_id, paid_by, paid_to, amount, status, settled_on, note, created_by, created_at"
     )
-    .eq("household_id", membership.household_id)
+    .eq("household_id", activeHouseholdId)
     .order("created_at", { ascending: false });
 
   if (settlementError) {
@@ -433,9 +753,10 @@ for (const settlement of loadedSettlements) {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, activeHouseholdId]);
 
   const personal = space === "personal";
+  const activeHousehold = households.find((home) => home.id === activeHouseholdId) ?? null;
   const visibleTransactions = transactions.filter(
     (item) => item.space === space
   );
@@ -814,7 +1135,7 @@ function exportReportPdf() {
     setKind("expense");
     setName("");
     setAmount("");
-    setCategory("Food");
+    setCategory("");
     setNote("");
     setShowAdd(true);
   }
@@ -1010,53 +1331,30 @@ calculatedSharesToSave = shares.map((share) => ({
       let householdId: string | null = null;
 
       if (space === "household") {
-        const { data: membership, error: membershipError } = await supabase
-          .from("household_members")
-          .select("household_id")
-          .eq("user_id", session!.user.id)
-          .limit(1)
-          .maybeSingle();
-
-        if (membershipError) throw membershipError;
-
-        if (!membership?.household_id) {
+        if (!activeHouseholdId) {
           throw new Error(
             "No household membership was found. Your transaction has not been saved."
           );
         }
 
-        householdId = membership.household_id;
+        householdId = activeHouseholdId;
       }
 
-      const categoryNames: Record<string, string> = {
-  Food: "Food & Groceries",
-  Groceries: "Food & Groceries",
-  Housing: "Rent",
-  Bills: "Utilities",
-  Transport: "Transportation",
-  Health: "Healthcare",
-  Other: "Other Expenses",
-  Salary: "Salary",
-  Freelance: "Freelance",
-  "Business income": "Other Income",
-  "Other income": "Other Income",
-};
 
-      const databaseCategoryName = categoryNames[category] ?? category;
 
       const { data: categoryRow, error: categoryError } = await supabase
         .from("categories")
-        .select("id")
-        .eq("name", databaseCategoryName)
+        .select("id, name")
+        .eq("id", category)
         .eq("kind", kind)
-        .limit(1)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (categoryError) throw categoryError;
 
       if (!categoryRow) {
         throw new Error(
-          `The category "${databaseCategoryName}" isn't available to your account. No transaction was saved.`
+          "Please choose an active category. No transaction was saved."
         );
       }
 
@@ -1117,7 +1415,7 @@ if (splitError) {
       const newTransaction: Transaction = {
         id: saved.id,
         name: saved.description,
-        category: databaseCategoryName,
+        category: categoryRow.name,
         amount: Number(saved.amount),
         type: saved.kind,
         space: saved.scope === "shared" ? "household" : "personal",
@@ -1435,9 +1733,9 @@ setSharedBalance((current) =>
 return (
   <div className={`app ${personal ? "personal-theme" : "household-theme"}`}>
       <aside className="sidebar">
-        <a className="brand" href="#" onClick={(e) => e.preventDefault()}>
-          <span className="brand-mark">♡</span>
-          <span>together<span className="brand-dot">.</span></span>
+        <a className="brand" href="#" onClick={(e) => e.preventDefault()} title={activeHousehold?.name ?? "Together"}>
+          <span className="brand-mark">{activeHousehold ? householdIconDisplay(activeHousehold.icon) : "♡"}</span>
+          <span className="brand-household-name">{activeHousehold?.name ?? "together."}</span>
         </a>
 
         <p className="nav-caption">YOUR SPACE</p>
@@ -1451,10 +1749,10 @@ return (
               >
                 <span className="nav-icon">
               {({
-                  Home: "⌂",
-                  Activity: "↗",
-                  Reports: "▥",
-                  "My Finance": "♡",
+                  Home: "🏠",
+                  Activity: "🕒",
+                  Reports: "📊",
+                  "My Finance": "💜",
                   Settings: "⚙️",
                 } as Record<Tab, string>)[item]}
           </span>
@@ -1488,19 +1786,21 @@ return (
 
       <main className="main-content">
         <header className="topbar">
-          <div className="mobile-brand">
-            <span className="brand-mark">♡</span> together.
+          <div className="mobile-brand" title={activeHousehold?.name ?? "Together"}>
+            <span className="brand-mark">{activeHousehold ? householdIconDisplay(activeHousehold.icon) : "♡"}</span>
+            <span className="brand-household-name">{activeHousehold?.name ?? "together."}</span>
           </div>
           <div className="breadcrumb">
             <span>YOUR FINANCES</span>
             <span className="breadcrumb-divider">/</span>
-            <strong>{personal ? "My Personal Finance" : "Household Finance"}</strong>
+            <strong>{tab === "Settings" ? "Settings" : personal ? "My Personal Finance" : "Household Finance"}</strong>
           </div>
+          {!personal && tab !== "Settings" && <select className="topbar-household-select" aria-label="Switch household" value={activeHouseholdId ?? ""} onChange={(e) => setActiveHouseholdId(e.target.value)}>{households.map((home) => <option key={home.id} value={home.id}>{householdIconDisplay(home.icon)} {home.name}</option>)}</select>}
           <button className="profile-button" title="Your profile">🐻</button>
         </header>
 
         <div className="page-content">
-          <div className="welcome-row">
+          {tab !== "Settings" && <div className="welcome-row">
             <div>
               <div className="eyebrow">
                 {personal ? "YOUR OWN LITTLE CORNER 🌷" : "YOUR LIFE, TOGETHER 💜"}
@@ -1519,7 +1819,8 @@ return (
             </button>
           </div>
 
-          <div className="space-switcher" aria-label="Finance space">
+          }
+          {tab !== "Settings" && <div className="space-switcher" aria-label="Finance space">
             <button
               className={!personal ? "selected household-option" : ""}
               onClick={() => {
@@ -1538,7 +1839,7 @@ return (
             >
               🌷 My Personal Finance <span className="lock-label">PRIVATE</span>
             </button>
-          </div>
+          </div>}
 
           {tab === "Home" && !personal && (
             <>
@@ -1549,16 +1850,21 @@ return (
                   <p>Every small step helps build the life you want together.</p>
                 </div>
                 <div className="couple-avatars">
-                  <div className="big-avatar bear">🐻</div>
+                  <div className="couple-member">
+                    <div className="big-avatar bear">🐻</div>
+                    <span>{householdMembers.find((member) => member.display_name.toLowerCase().includes("teddy"))?.display_name || "Teddy"}</span>
+                  </div>
                   <span className="heart-between">♥</span>
-                  <div className="big-avatar bunny">🐰</div>
+                  <div className="couple-member">
+                    <div className="big-avatar bunny">🐰</div>
+                    <span>{householdMembers.find((member) => member.display_name.toLowerCase().includes("linlanee"))?.display_name || "Linlanee"}</span>
+                  </div>
                 </div>
                 <span className="banner-decoration decoration-one">✦</span>
                 <span className="banner-decoration decoration-two">♡</span>
               </section>
   
-<div className="household-balance-layout">
-              <section className="balance-card">
+<section className="balance-card">
                 <div className="balance-heading">
                   <span className="balance-icon">♡</span>
                   <div>
@@ -1589,38 +1895,8 @@ return (
                   View expense ledger <span>→</span>
                 </button>
               </section>
-              
-<section
-    className="panel household-members-card"
-    style={{ marginBottom: "0", padding: "0.4rem 0.7rem" }}
-  >
-    
-<div className="panel-heading">
-  <div className="household-members-heading">
-    <span className="balance-icon">♧</span>
-    <div>
-      <span className="card-label">YOUR HOUSEHOLD</span>
-      <h2>Household members</h2>
-    </div>
-  </div>
-</div>
 
-  {householdMembers.length > 0 ? (
-    <div>
-      {householdMembers.map((member) => (
-        <div
-          key={member.user_id}
-          style={{ padding: "0.5rem 0" }}
-        >
-          👤 {member.display_name}
-        </div>
-      ))}
-    </div>
-  ) : (
-    <p>No household members found yet.</p>
-  )}
-</section>
-</div>
+
 
               <section className="summary-grid">
                 <article className="summary-card">
@@ -1979,95 +2255,230 @@ return (
           )}
 
           {tab === "Settings" && (
-            <section className="settings-page">
-              <div className="panel">
-                <span className="section-kicker">YOUR ACCOUNT</span>
-                <h2>Settings ⚙️</h2>
-                <p className="welcome-description">
-                  Manage your account and make this little space feel like yours.
-                </p>
-              </div>
-
-              <section className="panel">
+            <section className="settings-workspace">
+              <aside className="settings-nav-panel">
+                <h1>Settings</h1>
+                <nav aria-label="Settings sections">
+                  <button type="button" className={settingsSection === "profile" ? "active" : ""} onClick={() => setSettingsSection("profile")}><span className="settings-nav-icon">👤</span><span><strong>My Profile</strong><small>Account, email and security</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "households" ? "active" : ""} onClick={() => setSettingsSection("households")}><span className="settings-nav-icon">🏡</span><span><strong>Household Management</strong><small>Manage your households, members and settings</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "personal" ? "active" : ""} onClick={() => setSettingsSection("personal")}><span className="settings-nav-icon">💳</span><span><strong>Personal Finance</strong><small>Your private money space</small></span><b>›</b></button>
+                </nav>
+              </aside>
+              <div className="settings-detail-area">
+                {settingsSection === "profile" && (
+                  <div className="settings-section-content">
+                    <div className="settings-section-heading"><h2>My Profile</h2><p>Your account details and how your name appears in the app.</p></div>
+              <section className="panel settings-profile-panel">
                 <div className="panel-heading">
                   <div>
                     <span className="section-kicker">PROFILE</span>
                     <h2>My profile</h2>
+                    <p className="welcome-description">Your account details and how your name appears in the app.</p>
                   </div>
                   <span className="panel-emoji">🌷</span>
                 </div>
-                <p className="welcome-description">
-                  Your account is connected to your Couple Finance login.
-                </p>
+                <div className="profile-details">
+                  <div className="profile-name-field">
+                    <label htmlFor="settings-display-name">Display name</label>
+                    <input
+                      id="settings-display-name"
+                      type="text"
+                      value={displayName}
+                      onChange={(event) => {
+                        setDisplayName(event.target.value);
+                        setProfileMessage("");
+                      }}
+                      placeholder="Enter your display name"
+                    />
+                  </div>
+                  <div className="profile-email-card">
+                    <span>Email address</span>
+                    <strong>{session?.user?.email || "No email available"}</strong>
+                  </div>
+                </div>
+                <div className="profile-actions">
+                  <button className="primary-button" onClick={() => void handleSaveProfile()}>Save profile</button>
+                  {profileMessage && <p role="status" className="profile-save-message">{profileMessage}</p>}
+                </div>
               </section>
-
-              <section className="panel">
+                  </div>
+                )}
+                {settingsSection === "households" && (
+                  <div className="settings-section-content">
+                    <div className="settings-section-heading"><h2>Household Management</h2><p>Create, edit and manage your households.</p></div>
+              <section className="panel household-management-panel">
                 <div className="panel-heading">
                   <div>
-                    <span className="section-kicker">PREFERENCES</span>
-                    <h2>App preferences</h2>
+                    <span className="section-kicker">YOUR SHARED SPACES</span>
+                    <h2>Household Management</h2>
+                    <p className="welcome-description">Create, edit and manage your households.</p>
+                  </div>
+                </div>
+                <div className="household-picker-heading">
+                  <strong>Your Households</strong>
+                  <button className="primary-button" type="button" onClick={() => setShowCreateHousehold(true)}>＋ Create Household</button>
+                </div>
+                <div className="household-picker-grid">
+                  {households.map((home) => (
+                    <button type="button" key={home.id} className={`household-choice ${activeHouseholdId === home.id ? "selected" : ""}`} onClick={() => setActiveHouseholdId(home.id)}>
+                      <span className="household-choice-icon">{householdIconDisplay(home.icon)}</span>
+                      <span><strong>{home.name}</strong><small>{home.memberCount} members</small></span>
+                      {activeHouseholdId === home.id && <span className="household-check">✓</span>}
+                    </button>
+                  ))}
+                </div>
+                {showCreateHousehold && (
+                  <div className="household-create-row">
+                    <input value={newHouseholdName} onChange={(e) => setNewHouseholdName(e.target.value)} placeholder="e.g. Family Home" />
+                    <button type="button" className="primary-button" disabled={householdSaving || !newHouseholdName.trim()} onClick={() => void createHousehold()}>{householdSaving ? "Creating..." : "Create"}</button>
+                    <button type="button" className="secondary-button" onClick={() => setShowCreateHousehold(false)}>Cancel</button>
+                  </div>
+                )}
+                {activeHouseholdId && (
+                  <div className="household-detail-card">
+                    <div className="household-detail-heading">
+                      <span className="household-large-icon">{householdIconDisplay(householdIconDraft)}</span>
+                      <div><h3>{households.find((h) => h.id === activeHouseholdId)?.name}</h3><p>Household · {households.find((h) => h.id === activeHouseholdId)?.memberCount ?? 0} members</p></div>
+                      <span className="household-active-pill">Active</span>
+                    </div>
+                    <div className="household-tabs">
+                      {([["general","⚙️","General"],["members","👥","Members"],["invitations","✉️","Invitations"],["permissions","🛡️","Permissions"]] as const).map(([key, icon, label]) => (
+                        <button type="button" key={key} className={householdSettingsTab === key ? "selected" : ""} onClick={() => setHouseholdSettingsTab(key)}><span>{icon}</span>{label}</button>
+                      ))}
+                    </div>
+                    {householdSettingsTab === "general" && (
+                      <div className="household-general-fields">
+                        <label><span><strong>Household Name</strong><small>The name of your shared space.</small></span><input value={householdNameDraft} onChange={(e) => setHouseholdNameDraft(e.target.value)} /></label>
+                        <div className="household-icon-field"><span><strong>Household Icon</strong><small>Choose an icon for this household.</small></span><div>{["🏡","💗","🌱","☕","🐾","🧳","🏢","🏠"].map((icon) => <button type="button" key={icon} className={householdIconDraft === icon ? "selected" : ""} onClick={() => setHouseholdIconDraft(icon)}>{icon}</button>)}</div></div>
+                        <button type="button" className="primary-button household-save-button" disabled={householdSaving} onClick={() => void saveHouseholdDetails()}>{householdSaving ? "Saving..." : "Save changes"}</button>
+                      </div>
+                    )}
+                    {householdSettingsTab === "members" && (
+                      <div className="household-members-list">
+                        <div className="household-members-title"><div><strong>Household Members</strong><small>Member names and avatars belong to this household only.</small></div></div>
+                        {householdMembers.map((member) => (
+                          <div className="household-member-row" key={member.user_id}>
+                            <span className="household-member-avatar">{member.avatar || (member.user_id === session.user.id ? "🐻" : "🐰")}</span>
+                            {memberEditId === member.user_id ? (
+                              <div className="member-edit-fields"><input value={memberNameDraft} onChange={(e) => setMemberNameDraft(e.target.value)} /><div>{["🐻","🐰","🐱","🐶","🦊","🐼","🐸","🐨"].map((avatar) => <button type="button" key={avatar} className={memberAvatarDraft === avatar ? "selected" : ""} onClick={() => setMemberAvatarDraft(avatar)}>{avatar}</button>)}</div><button type="button" className="primary-button" onClick={() => void saveMemberIdentity(member.user_id)}>Save</button></div>
+                            ) : <><div className="household-member-info"><strong>{member.display_name}</strong><small>{member.role === "owner" ? "♛ Owner" : "Member"}</small></div><button type="button" className="secondary-button" onClick={() => { setMemberEditId(member.user_id); setMemberNameDraft(member.display_name); setMemberAvatarDraft(member.avatar || (member.user_id === session.user.id ? "🐻" : "🐰")); }}>✎ Edit</button></>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {householdSettingsTab === "invitations" && (
+                      <div className="household-invitation-panel"><strong>Invite a Member</strong><p>Enter their email address to create a household invitation.</p><div><input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="partner@example.com" /><button type="button" className="primary-button" onClick={() => void createHouseholdInvitation()}>＋ Invite Member</button></div>{inviteMessage && <small role="status">{inviteMessage}</small>}</div>
+                    )}
+                    {householdSettingsTab === "permissions" && (
+                      <div className="household-invitation-panel"><strong>Household Permissions</strong><p>Owners manage household details and invitations. Members can view shared finances and manage their own household identity.</p><small>Your current role: {households.find((h) => h.id === activeHouseholdId)?.role}</small></div>
+                    )}
+                    {householdMessage && <p className="household-status-message" role="status">{householdMessage}</p>}
+                  </div>
+                )}
+              </section>
+                  </div>
+                )}
+                {settingsSection === "personal" && (
+                  <div className="settings-section-content">
+                    <div className="settings-section-heading"><h2>Personal Finance</h2><p>Manage the settings for your private money space.</p></div>
+                    <section className="panel settings-personal-panel">
+                      <div className="preference-row"><span className="preference-icon">🔒</span><div><strong>Personal finance privacy</strong><small>Your personal records are visible only to you and are separate from household finances.</small></div><span className="preference-value privacy-value">Private</span></div>
+                    </section>
+                  </div>
+                )}
+                {settingsSection === "households" && (
+                  <div className="settings-section-content household-preferences-content">
+              <section className="panel settings-preferences-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="section-kicker">HOUSEHOLD SETTINGS</span>
+                    <h2>Finance preferences</h2>
+                    <p className="welcome-description">Manage currency, privacy and categories for your finances.</p>
                   </div>
                   <span className="panel-emoji">💜</span>
                 </div>
-                <div className="settings-option">
-                  <div>
-                    <strong>Currency</strong>
-                    
-  <div className="profile-details">
-  <div className="settings-option">
-  <div className="profile-name-field">
-    <strong>Display name</strong>
-    <input
-      type="text"
-      value={displayName}
-      onChange={(event) => {
-        setDisplayName(event.target.value);
-        setProfileMessage("");
-      }}
-      placeholder="Enter your display name"
-    />
-  </div>
-</div>
-<div className="profile-actions">
-  <button
-    className="primary-button"
-    onClick={() => void handleSaveProfile()}
-  >
-    Save profile
-  </button>
-
-  {profileMessage && (
-    <p className="welcome-description" role="status">
-      {profileMessage}
-    </p>
-  )}
-</div>
-
-  <div className="settings-option">
-    <div>
-      <strong>Email address</strong>
-      <p className="welcome-description">
-        {session?.user?.email || "No email available"}
-      </p>
-    </div>
-  </div>
-</div>
+                <div className="preference-list">
+                  <div className="preference-row">
+                    <span className="preference-icon">฿</span>
+                    <div><strong>Currency</strong><small>Default currency for your records</small></div>
+                    <span className="preference-value">THB · Thai Baht</span>
                   </div>
-                  <span className="settings-value">THB (฿)</span>
-                </div>
-                <div className="settings-option">
-                  <div>
-                    <strong>Personal finance privacy</strong>
-                    <p className="welcome-description">
-                      Your personal records should remain private to your account.
-                    </p>
+                  <div className="preference-row">
+                    <span className="preference-icon">🔒</span>
+                    <div><strong>Personal finance privacy</strong><small>Your personal records are visible only to you</small></div>
+                    <span className="preference-value privacy-value">Private</span>
                   </div>
-                  <span className="settings-value">🔒 Private</span>
                 </div>
               </section>
+
+              <section className="panel category-management">
+                <div className="panel-heading">
+                  <div>
+                    <span className="section-kicker">CUSTOMIZE YOUR FINANCES</span>
+                    <h2>Category management</h2>
+                    <p className="welcome-description">
+                      Manage the categories shared by Household and Personal Finance.
+                    </p>
+                  </div>
+                  <span className="panel-emoji">🗂️</span>
+                </div>
+
+                <div className="category-toolbar">
+                  <div className="category-kind-tabs">
+                    <button type="button" className={categoryKindTab === "expense" ? "selected" : ""} onClick={() => { setCategoryKindTab("expense"); resetCategoryForm(); setExpandedCategoryIds([]); }}>Expenses</button>
+                    <button type="button" className={categoryKindTab === "income" ? "selected" : ""} onClick={() => { setCategoryKindTab("income"); resetCategoryForm(); setExpandedCategoryIds([]); }}>Income</button>
+                  </div>
+                  <button type="button" className="primary-button category-add-main" onClick={() => { resetCategoryForm(); setShowCategoryEditor(true); }}><span>＋</span> Add category</button>
+                </div>
+
+                {showCategoryEditor && (
+                  <div className="category-modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) resetCategoryForm(); }}>
+                    <form className="category-editor category-editor-modal" onSubmit={(event) => void saveCategory(event)}>
+                      <div className="category-editor-heading">
+                        <div><strong>{editingCategoryId ? "Edit category" : categoryFormParentId ? "Add subcategory" : "Add category"}</strong><p>Choose an icon and give your category a name.</p></div>
+                        <button type="button" className="category-modal-close" aria-label="Close" onClick={resetCategoryForm}>×</button>
+                      </div>
+                      <div className="category-editor-fields">
+                        <label><span>Icon</span><input value={categoryFormIcon} onChange={(event) => setCategoryFormIcon(event.target.value)} maxLength={8} aria-label="Category icon" /></label>
+                        <label className="category-name-field"><span>Category name</span><input value={categoryFormName} onChange={(event) => setCategoryFormName(event.target.value)} placeholder="e.g. Food & Dining" maxLength={60} autoFocus /></label>
+                        <label><span>Main category</span><select value={categoryFormParentId} onChange={(event) => setCategoryFormParentId(event.target.value)}><option value="">None (Main category)</option>{categories.filter((item) => item.kind === categoryKindTab && item.parent_id === null && item.id !== editingCategoryId).map((item) => <option key={item.id} value={item.id}>{item.icon || "📁"} {item.name}</option>)}</select></label>
+                      </div>
+                      <div className="category-editor-actions"><button type="button" className="secondary-button" onClick={resetCategoryForm}>Cancel</button><button className="primary-button" type="submit" disabled={categorySaving}>{categorySaving ? "Saving..." : editingCategoryId ? "Save changes" : "Add category"}</button></div>
+                    </form>
+                  </div>
+                )}
+
+                {categoryMessage && <p className="category-message" role="status">{categoryMessage}</p>}
+                {categoryLoading ? <p className="welcome-description">Loading categories...</p> : (
+                  <div className="category-tree">
+                    {categories.filter((item) => item.kind === categoryKindTab && item.parent_id === null).map((parent) => {
+                      const children = categories.filter((child) => child.parent_id === parent.id);
+                      const isExpanded = expandedCategoryIds.includes(parent.id);
+                      return (
+                        <div className={`category-group ${!parent.is_active ? "inactive" : ""} ${isExpanded ? "expanded" : "collapsed"}`} key={parent.id}>
+                          <div className="category-group-heading">
+                            <button type="button" className="category-expand-button" aria-label={isExpanded ? "Collapse category" : "Expand category"} onClick={() => setExpandedCategoryIds((current) => isExpanded ? current.filter((id) => id !== parent.id) : [...current, parent.id])}><span className={isExpanded ? "chevron expanded" : "chevron"}>›</span></button>
+                            <span className="category-icon">{parent.icon || "📁"}</span>
+                            <button type="button" className="category-parent-title" onClick={() => setExpandedCategoryIds((current) => isExpanded ? current.filter((id) => id !== parent.id) : [...current, parent.id])}><strong>{parent.name}</strong><small>{children.length} {children.length === 1 ? "subcategory" : "subcategories"}{!parent.is_active ? " · Inactive" : ""}</small></button>
+                            <div className="category-menu-wrap"><button type="button" className="category-menu-trigger" aria-label={`Actions for ${parent.name}`} onClick={() => setOpenCategoryMenuId(openCategoryMenuId === parent.id ? null : parent.id)}>•••</button>{openCategoryMenuId === parent.id && <div className="category-action-menu"><button type="button" onClick={() => startEditCategory(parent)}>✎ <span>Edit</span></button><button type="button" onClick={() => { void toggleCategoryActive(parent); setOpenCategoryMenuId(null); }}>{parent.is_active ? "◉" : "◎"} <span>{parent.is_active ? "Deactivate" : "Activate"}</span></button></div>}</div>
+                          </div>
+                          {isExpanded && <div className="category-children">
+                            {children.map((child) => <div className={`category-row subcategory-row ${!child.is_active ? "inactive" : ""}`} key={child.id}><span className="category-icon">{child.icon || "•"}</span><div className="category-row-name"><strong>{child.name}</strong>{!child.is_active && <small>Inactive</small>}</div><span className={`category-active-dot ${child.is_active ? "on" : "off"}`} title={child.is_active ? "Active" : "Inactive"} /><div className="category-menu-wrap"><button type="button" className="category-menu-trigger" aria-label={`Actions for ${child.name}`} onClick={() => setOpenCategoryMenuId(openCategoryMenuId === child.id ? null : child.id)}>•••</button>{openCategoryMenuId === child.id && <div className="category-action-menu"><button type="button" onClick={() => startEditCategory(child)}>✎ <span>Edit</span></button><button type="button" onClick={() => { void toggleCategoryActive(child); setOpenCategoryMenuId(null); }}>{child.is_active ? "◉" : "◎"} <span>{child.is_active ? "Deactivate" : "Activate"}</span></button></div>}</div></div>)}
+                            <button type="button" className="add-subcategory-link" onClick={() => { resetCategoryForm(); setCategoryFormParentId(parent.id); setCategoryFormName(""); setCategoryFormIcon("•"); setShowCategoryEditor(true); }}>＋ Add subcategory</button>
+                          </div>}
+                        </div>
+                      );
+                    })}
+                    {categories.filter((item) => item.kind === categoryKindTab && item.parent_id === null).length === 0 && <div className="empty-chart"><span className="empty-chart-icon">🗂️</span><strong>No categories yet</strong><span>Add your first main category above.</span></div>}
+                  </div>
+                )}
+                <p className="category-footnote">Renaming keeps existing transactions linked to the category. Deactivated categories remain in your history but are hidden from new entries. Categories are not permanently deleted.</p>
+              </section>
+                  </div>
+                )}
+              </div>
             </section>
           )}
-
 
           {tab === "Activity" && (
             <section className="panel activity-panel">
@@ -2458,10 +2869,10 @@ return (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => changeTab(item)}>
             <span>
         {{
-               Home: "⌂",
-               Activity: "↗",
-               Reports: "▥",
-               "My Finance": "♡",
+               Home: "🏠",
+               Activity: "🕒",
+               Reports: "📊",
+               "My Finance": "💜",
                Settings: "⚙️",
          }[item]}
 </span>
@@ -2492,8 +2903,8 @@ return (
 
             <form onSubmit={saveTransaction} className="add-transaction-form">
               <div className="type-switch">
-                <button type="button" className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); setCategory("Food"); }}>− Expense</button>
-                <button type="button" className={kind === "income" ? "selected" : ""} onClick={() => { setKind("income"); setCategory("Salary"); }}>＋ Income</button>
+                <button type="button" className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); setCategory(""); }}>− Expense</button>
+                <button type="button" className={kind === "income" ? "selected" : ""} onClick={() => { setKind("income"); setCategory(""); }}>＋ Income</button>
               </div>
 
               <div className="transaction-amount-section">
@@ -2509,12 +2920,20 @@ return (
               <input id="transaction-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="What was this for?" required />
 
               <label className="form-label" htmlFor="transaction-category">Category</label>
-              <select id="transaction-category" value={category} onChange={(event) => setCategory(event.target.value)}>
-                {(kind === "expense"
-                  ? ["Food", "Groceries", "Housing", "Bills", "Transport", "Shopping", "Health", "Other"]
-                  : ["Salary", "Freelance", "Business income", "Other income"]
-                ).map((item) => <option key={item}>{item}</option>)}
+              <select id="transaction-category" value={category} onChange={(event) => setCategory(event.target.value)} required>
+                <option value="">Choose a category</option>
+                {categories.filter((item) => item.kind === kind && item.is_active && item.parent_id === null).map((parent) => {
+                  const children = categories.filter((item) => item.parent_id === parent.id && item.is_active);
+                  return children.length > 0 ? (
+                    <optgroup key={parent.id} label={`${parent.icon || "📁"} ${parent.name}`}>
+                      {children.map((child) => <option key={child.id} value={child.id}>{child.icon || "•"} {child.name}</option>)}
+                    </optgroup>
+                  ) : <option key={parent.id} value={parent.id}>{parent.icon || "📁"} {parent.name}</option>;
+                })}
               </select>
+              {categories.filter((item) => item.kind === kind && item.is_active && item.parent_id === null).length === 0 && (
+                <p className="category-select-hint">No active categories yet. Add one in Settings → Category Management.</p>
+              )}
 
               {space === "household" && kind === "expense" && (
                 <section className="household-split-fields add-split-card" aria-label="Household expense split">
