@@ -1784,6 +1784,22 @@ return (
         </div>
       </aside>
 
+      <nav className="mobile-bottom-nav" aria-label="Main navigation">
+        {(["Home", "Activity", "Reports", "My Finance", "Settings"] as Tab[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`mobile-bottom-nav-item ${tab === item ? "active" : ""}`}
+            onClick={() => changeTab(item)}
+          >
+            <span className="mobile-bottom-nav-icon">
+              {({ Home: "⌂", Activity: "◷", Reports: "▤", "My Finance": "♡", Settings: "⚙️" } as Record<Tab, string>)[item]}
+            </span>
+            <span>{item === "My Finance" ? "My Finance" : item}</span>
+          </button>
+        ))}
+      </nav>
+
       <main className="main-content">
         <header className="topbar">
           <div className="mobile-brand" title={activeHousehold?.name ?? "Together"}>
@@ -1793,7 +1809,7 @@ return (
           <div className="breadcrumb">
             <span>YOUR FINANCES</span>
             <span className="breadcrumb-divider">/</span>
-            <strong>{tab === "Settings" ? "Settings" : personal ? "My Personal Finance" : "Household Finance"}</strong>
+            <strong className={tab !== "Settings" && !personal ? "household-finance-breadcrumb" : ""}>{tab === "Settings" ? "Settings" : personal ? "My Personal Finance" : "Household Finance"}</strong>
           </div>
           {!personal && tab !== "Settings" && <select className="topbar-household-select" aria-label="Switch household" value={activeHouseholdId ?? ""} onChange={(e) => setActiveHouseholdId(e.target.value)}>{households.map((home) => <option key={home.id} value={home.id}>{householdIconDisplay(home.icon)} {home.name}</option>)}</select>}
           <button className="profile-button" title="Your profile">🐻</button>
@@ -2259,9 +2275,9 @@ return (
               <aside className="settings-nav-panel">
                 <h1>Settings</h1>
                 <nav aria-label="Settings sections">
-                  <button type="button" className={settingsSection === "profile" ? "active" : ""} onClick={() => setSettingsSection("profile")}><span className="settings-nav-icon">👤</span><span><strong>My Profile</strong><small>Account, email and security</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "profile" ? "active" : ""} onClick={() => setSettingsSection("profile")}><span className="settings-nav-icon">⚙️</span><span><strong>My Profile</strong><small>Account, email and security</small></span><b>›</b></button>
                   <button type="button" className={settingsSection === "households" ? "active" : ""} onClick={() => setSettingsSection("households")}><span className="settings-nav-icon">🏡</span><span><strong>Household Management</strong><small>Manage your households, members and settings</small></span><b>›</b></button>
-                  <button type="button" className={settingsSection === "personal" ? "active" : ""} onClick={() => setSettingsSection("personal")}><span className="settings-nav-icon">💳</span><span><strong>Personal Finance</strong><small>Your private money space</small></span><b>›</b></button>
+                  <button type="button" className={settingsSection === "personal" ? "active" : ""} onClick={() => setSettingsSection("personal")}><span className="settings-nav-icon">👤</span><span><strong>Personal Finance</strong><small>Your private money space</small></span><b>›</b></button>
                 </nav>
               </aside>
               <div className="settings-detail-area">
@@ -2869,10 +2885,10 @@ return (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => changeTab(item)}>
             <span>
         {{
-               Home: "🏠",
-               Activity: "🕒",
-               Reports: "📊",
-               "My Finance": "💜",
+               Home: "⌂",
+               Activity: "◷",
+               Reports: "▤",
+               "My Finance": "♡",
                Settings: "⚙️",
          }[item]}
 </span>
