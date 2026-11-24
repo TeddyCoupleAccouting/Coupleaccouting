@@ -586,6 +586,8 @@ const [editError, setEditError] = useState("");
 const [savingEdit, setSavingEdit] = useState(false);
 
 const [search, setSearch] = useState("");
+const [showActivityFilters, setShowActivityFilters] = useState(false);
+const [expandedTransactionId, setExpandedTransactionId] = useState<string | number | null>(null);
 
 const [activityTypeFilter, setActivityTypeFilter] = useState<
   "all" | "expense" | "income"
@@ -2498,9 +2500,12 @@ return (
 
           {tab === "Activity" && (
             <section className="panel activity-panel">
-              <div className="panel-heading">
-                <div><span className="section-kicker">YOUR MONEY, IN MOTION</span><h2>{personal ? "My transactions" : "Household activity"}</h2></div>
-                <span className="activity-count">{filteredTransactions.length} records</span>
+              <div className="activity-heading">
+                <div>
+                  <span className="section-kicker">YOUR MONEY, IN MOTION</span>
+                  <h2>Recent transactions</h2>
+                  <p>{filteredTransactions.length} {filteredTransactions.length === 1 ? "record" : "records"}</p>
+                </div>
               </div>
               
 <input
@@ -2538,90 +2543,80 @@ return (
   </div>
 </div>
 
-<div className="activity-secondary-filters">
-  <div className="activity-date-filters">
-    <label>
-      <span>From</span>
-      <input
-        type="date"
-        value={activityStartDate}
-        onChange={(event) => setActivityStartDate(event.target.value)}
-        aria-label="Start date"
-      />
-    </label>
-
-    <label>
-      <span>To</span>
-      <input
-        type="date"
-        value={activityEndDate}
-        min={activityStartDate || undefined}
-        onChange={(event) => setActivityEndDate(event.target.value)}
-        aria-label="End date"
-      />
-    </label>
-
-    {(activityStartDate || activityEndDate) && (
-      <button
-        type="button"
-        className="activity-clear-dates"
-        onClick={() => {
-          setActivityStartDate("");
-          setActivityEndDate("");
-        }}
-      >
-        Clear dates
-      </button>
+<div className="activity-filter-toolbar">
+  <button
+    type="button"
+    className={`activity-filter-toggle ${showActivityFilters ? "open" : ""}`}
+    onClick={() => setShowActivityFilters((current) => !current)}
+    aria-expanded={showActivityFilters}
+    aria-controls="activity-advanced-filters"
+  >
+    <span>⚙</span>
+    <span>Filters</span>
+    {((activityStartDate ? 1 : 0) + (activityEndDate ? 1 : 0) +
+      (activityPersonFilter !== "all" ? 1 : 0) + (activityCategoryFilter !== "all" ? 1 : 0)) > 0 && (
+      <span className="activity-filter-badge">
+        {(activityStartDate ? 1 : 0) + (activityEndDate ? 1 : 0) +
+          (activityPersonFilter !== "all" ? 1 : 0) + (activityCategoryFilter !== "all" ? 1 : 0)}
+      </span>
     )}
-  </div>
-
-  {!personal && (
-    <div className="activity-person-filter">
-      <label htmlFor="activity-person-select">Paid by</label>
-      <select
-        id="activity-person-select"
-        className="activity-category-select"
-        value={activityPersonFilter}
-        onChange={(event) =>
-          setActivityPersonFilter(event.target.value)
-        }
-      >
-        <option value="all">Everyone</option>
-        {householdMembers.map((member) => (
-          <option key={member.user_id} value={member.user_id}>
-            {member.user_id === session?.user.id
-              ? `Me (${member.display_name})`
-              : member.display_name}
-          </option>
-        ))}
-      </select>
+    <span className="activity-filter-chevron">{showActivityFilters ? "⌃" : "⌄"}</span>
+  </button>
+  {showActivityFilters && (
+    <div className="activity-secondary-filters" id="activity-advanced-filters">
+      <div className="activity-date-filters">
+        <label>
+          <span>From</span>
+          <input type="date" value={activityStartDate}
+            onChange={(event) => setActivityStartDate(event.target.value)} aria-label="Start date" />
+        </label>
+        <label>
+          <span>To</span>
+          <input type="date" value={activityEndDate} min={activityStartDate || undefined}
+            onChange={(event) => setActivityEndDate(event.target.value)} aria-label="End date" />
+        </label>
+      </div>
+      {!personal && (
+        <div className="activity-person-filter">
+          <label htmlFor="activity-person-select">Paid by</label>
+          <select id="activity-person-select" className="activity-category-select"
+            value={activityPersonFilter} onChange={(event) => setActivityPersonFilter(event.target.value)}>
+            <option value="all">Everyone</option>
+            {householdMembers.map((member) => (
+              <option key={member.user_id} value={member.user_id}>
+                {member.user_id === session?.user.id ? `Me (${member.display_name})` : member.display_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="activity-category-filter">
+        <label htmlFor="activity-category-select">Category</label>
+        <select id="activity-category-select" className="activity-category-select"
+          value={activityCategoryFilter} onChange={(event) => setActivityCategoryFilter(event.target.value)}>
+          <option value="all">All categories</option>
+          {[...new Set(visibleTransactions.map((item) => item.category))].sort().map((category) => (
+            <option key={category} value={category}>{category}</option>
+          ))}
+        </select>
+      </div>
+      {(activityStartDate || activityEndDate || activityPersonFilter !== "all" || activityCategoryFilter !== "all") && (
+        <button type="button" className="activity-clear-filters" onClick={() => {
+          setActivityStartDate(""); setActivityEndDate("");
+          setActivityPersonFilter("all"); setActivityCategoryFilter("all");
+        }}>Clear all filters</button>
+      )}
     </div>
   )}
-
-  <select
-    className="activity-category-select"
-    value={activityCategoryFilter}
-    onChange={(event) =>
-      setActivityCategoryFilter(event.target.value)
-    }
-    aria-label="Filter by category"
-  >
-    <option value="all">All categories</option>
-    {[...new Set(visibleTransactions.map((item) => item.category))]
-      .sort()
-      .map((category) => (
-        <option key={category} value={category}>
-          {category}
-        </option>
-      ))}
-  </select>
 </div>
 
-<TransactionList 
+<TransactionList
    items={filteredTransactions}
    householdMembers={householdMembers}
    currentUserId={session?.user.id ?? ""}
-   onSelectTransaction={setSelectedTransaction} 
+   expandedTransactionId={expandedTransactionId}
+   onToggleTransaction={(id) => setExpandedTransactionId((current) => current === id ? null : id)}
+   onSelectTransaction={setSelectedTransaction}
    />
 
               {filteredTransactions.length === 0 && <p className="empty-message">No matching transactions yet.</p>}
@@ -3261,120 +3256,101 @@ function TransactionList({
   items,
   householdMembers = [],
   currentUserId = "",
+  expandedTransactionId = null,
+  onToggleTransaction,
   onSelectTransaction,
 }: {
   items: Transaction[];
   householdMembers?: HouseholdMember[];
   currentUserId?: string;
+  expandedTransactionId?: string | number | null;
+  onToggleTransaction: (id: string | number) => void;
   onSelectTransaction: (item: Transaction) => void;
 }) {
-  
   if (items.length === 0) {
     return <div className="empty-list">No transactions yet. Add your first one when you're ready. 🌷</div>;
   }
 
+  const groupedItems = items.reduce<Record<string, Transaction[]>>((groups, item) => {
+    const dateKey = item.date.slice(0, 10);
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(item);
+    return groups;
+  }, {});
+
   return (
     <div className="transaction-list">
-      
-{items.map((item) => {
-  const isHouseholdExpense =
-    item.space === "household" && item.type === "expense";
+      {Object.entries(groupedItems).map(([date, dateItems]) => (
+        <section className="transaction-date-group" key={date}>
+          <h3 className="transaction-date-heading">{formatTransactionDate(date)}</h3>
+          {dateItems.map((item) => {
+            const isExpanded = expandedTransactionId === item.id;
+            const isHouseholdExpense = item.space === "household" && item.type === "expense";
+            const payer = householdMembers.find((member) => member.user_id === item.paidByUserId);
+            const myShare = item.shares?.find((share) => share.userId === currentUserId);
+            const partnerShare = item.shares?.find((share) => share.userId !== currentUserId);
+            const payerName = item.paidByUserId === currentUserId ? "you" : payer?.display_name ?? "your partner";
+            let balanceMessage = "";
+            if (myShare && partnerShare) {
+              if (item.paidByUserId === currentUserId) {
+                balanceMessage = `${householdMembers.find((member) => member.user_id === partnerShare.userId)?.display_name ?? "Your partner"} owes you ${money(partnerShare.amount)}`;
+              } else {
+                balanceMessage = `You owe ${payerName} ${money(myShare.amount)}`;
+              }
+            }
 
-  const payer = householdMembers.find(
-    (member) => member.user_id === item.paidByUserId
-  );
-
-  const myShare = item.shares?.find(
-    (share) => share.userId === currentUserId
-  );
-
-  const partnerShare = item.shares?.find(
-    (share) => share.userId !== currentUserId
-  );
-
-  const payerName =
-    item.paidByUserId === currentUserId
-      ? "you"
-      : payer?.display_name ?? "your partner";
-
-  let balanceMessage = "";
-
-  if (myShare && partnerShare) {
-    if (item.paidByUserId === currentUserId) {
-      balanceMessage = `${partnerShare.userId === currentUserId ? "You" : householdMembers.find((m) => m.user_id === partnerShare.userId)?.display_name ?? "Your partner"} owes you ${money(partnerShare.amount)}`;
-    
-} else if (item.paidByUserId !== currentUserId) {
-  balanceMessage = `You owe ${payerName} ${money(myShare.amount)}`;
-}
- else {
-      balanceMessage = "";
-    }
-  }
-
-  return (
-<div
-  className="transaction-row"
-  key={item.id}
-  role="button"
-  tabIndex={0}
-  onClick={() => onSelectTransaction(item)}
-  onKeyDown={(event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onSelectTransaction(item);
-    }
-  }}
->
-        <div className="transaction-icon">{item.icon}</div>
-      <div className="transaction-info">
-        <strong>{item.name}</strong>
-        <span>{item.category} · {formatTransactionDate(item.date)}</span>
-
-        {isHouseholdExpense && (
-          <div className="household-payment-details">
-            <div>
-              Paid by {payerName}
-              {item.splitMethod && (
-                <> · {({
-                  equal: "Split equally",
-                  custom: "Exact amounts",
-                  percentage: "By percentage",
-                  shares: "By shares",
-                  adjustment: "Adjusted split",
-                } as Record<string, string>)[item.splitMethod] ?? item.splitMethod}</>
-              )}
-            </div>
-
-            {item.shares && item.shares.length > 0 && (
-              <div>
-                {item.shares.map((share) => {
-                  const memberName =
-                    share.userId === currentUserId
-                      ? "You"
-                      : householdMembers.find(
-                          (member) => member.user_id === share.userId
-                        )?.display_name ?? "Partner";
-
-                  return `${memberName} ${money(share.amount)}`;
-                }).join(" · ")}
-              </div>
-            )}
-
-            {balanceMessage && (
-              <div style={{ fontWeight: 600, marginTop: "2px" }}>
-                {balanceMessage}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className={`transaction-amount ${item.type}`}>
-        {item.type === "income" ? "+" : "−"}{money(item.amount)}
-      </div>
-    </div>
-  );
-})}
+            return (
+              <article className={`transaction-entry ${isExpanded ? "expanded" : ""}`} key={item.id}>
+                <div className="transaction-row" role="button" tabIndex={0} aria-expanded={isExpanded}
+                  onClick={() => onToggleTransaction(item.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault(); onToggleTransaction(item.id);
+                    }
+                  }}>
+                  <div className="transaction-icon">{item.icon}</div>
+                  <div className="transaction-info">
+                    <strong>{item.name}</strong>
+                    <span>{item.category}</span>
+                  </div>
+                  <div className={`transaction-amount ${item.type}`}>
+                    {item.type === "income" ? "+" : "−"}{money(item.amount)}
+                  </div>
+                  <span className="transaction-expand-indicator" aria-hidden="true">{isExpanded ? "⌃" : "⌄"}</span>
+                </div>
+                {isExpanded && (
+                  <div className="transaction-expanded-panel">
+                    <div className="transaction-expanded-meta">
+                      <span>{formatTransactionDate(item.date)}</span>
+                      <span>{item.space === "household" ? "💜 Household" : "🌷 Personal"}</span>
+                    </div>
+                    {isHouseholdExpense && (
+                      <div className="household-payment-details">
+                        <div>Paid by {payerName}{item.splitMethod && <> · {({
+                          equal: "Split equally", custom: "Exact amounts", percentage: "By percentage",
+                          shares: "By shares", adjustment: "Adjusted split",
+                        } as Record<string, string>)[item.splitMethod] ?? item.splitMethod}</>}</div>
+                        {item.shares && item.shares.length > 0 && (
+                          <div>{item.shares.map((share) => {
+                            const memberName = share.userId === currentUserId ? "You" :
+                              householdMembers.find((member) => member.user_id === share.userId)?.display_name ?? "Partner";
+                            return `${memberName} ${money(share.amount)}`;
+                          }).join(" · ")}</div>
+                        )}
+                        {balanceMessage && <div className="transaction-balance-message">{balanceMessage}</div>}
+                      </div>
+                    )}
+                    {item.notes && <p className="transaction-expanded-notes">{item.notes}</p>}
+                    <button type="button" className="transaction-open-details" onClick={(event) => {
+                      event.stopPropagation(); onSelectTransaction(item);
+                    }}>View details &amp; edit <span>→</span></button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ))}
     </div>
   );
 }
