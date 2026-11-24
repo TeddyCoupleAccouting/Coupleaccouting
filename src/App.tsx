@@ -2373,7 +2373,7 @@ return (
                       <div className="household-members-list">
                         <div className="household-members-title"><div><strong>Household Members</strong><small>Member names and avatars belong to this household only.</small></div></div>
                         {householdMembers.map((member) => (
-                          <div className="household-member-row" key={member.user_id}>
+                          <div className={`household-member-row ${memberEditId === member.user_id ? "is-editing" : ""}`} key={member.user_id}>
                             <span className="household-member-avatar">{member.avatar || (member.user_id === session.user.id ? "🐻" : "🐰")}</span>
                             {memberEditId === member.user_id ? (
                               <div className="member-edit-fields"><input value={memberNameDraft} onChange={(e) => setMemberNameDraft(e.target.value)} /><div>{["🐻","🐰","🐱","🐶","🦊","🐼","🐸","🐨"].map((avatar) => <button type="button" key={avatar} className={memberAvatarDraft === avatar ? "selected" : ""} onClick={() => setMemberAvatarDraft(avatar)}>{avatar}</button>)}</div><button type="button" className="primary-button" onClick={() => void saveMemberIdentity(member.user_id)}>Save</button></div>

@@ -4282,3 +4282,17 @@ body {
   .mobile-bottom-nav-item { min-height: 55px; font-size: 9px; }
   .mobile-bottom-nav-icon { font-size: 21px; }
 }
+
+/* iPhone fixes: household selector width and member identity editor overflow */
+@media (max-width: 760px) {
+  .settings-section-content .household-picker-grid { grid-template-columns: minmax(0, 1fr) !important; width: 100%; min-width: 0; }
+  .household-choice, .household-detail-card, .household-management-panel { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  .household-choice > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+  .household-member-row.is-editing { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 9px; min-width: 0; }
+  .household-member-row.is-editing .household-member-avatar { grid-column: 1; grid-row: 1; }
+  .household-member-row.is-editing .member-edit-fields { grid-column: 2; min-width: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; }
+  .household-member-row.is-editing .member-edit-fields input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .household-member-row.is-editing .member-edit-fields > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; width: 100%; min-width: 0; }
+  .household-member-row.is-editing .member-edit-fields > div button:not(.primary-button) { width: 100%; min-width: 0; height: 42px; padding: 0; }
+  .household-member-row.is-editing .member-edit-fields > .primary-button { justify-self: start; width: auto; min-width: 88px; min-height: 42px; padding: 8px 20px; font-size: 13px; }
+}
