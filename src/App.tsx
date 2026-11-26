@@ -1479,8 +1479,8 @@ async function handleSaveTransactionEdit() {
     return;
   }
 
-  if (!editCategory.trim()) {
-    setEditError("Please enter a category.");
+  if (!editCategory) {
+    setEditError("Please choose a category from your Settings.");
     return;
   }
 
@@ -1535,36 +1535,18 @@ async function handleSaveTransactionEdit() {
   setEditError("");
 
   try {
-    const categoryNames: Record<string, string> = {
-      Food: "Food & Groceries",
-      Groceries: "Food & Groceries",
-      Housing: "Rent",
-      Bills: "Utilities",
-      Transport: "Transportation",
-      Health: "Healthcare",
-      Other: "Other Expenses",
-      Salary: "Salary",
-      Freelance: "Freelance",
-      "Business income": "Other Income",
-      "Other income": "Other Income",
-    };
-
-    const databaseCategoryName =
-      categoryNames[editCategory.trim()] ?? editCategory.trim();
-
     const { data: categoryRow, error: categoryError } = await supabase
       .from("categories")
-      .select("id")
-      .eq("name", databaseCategoryName)
+      .select("id, name")
+      .eq("id", editCategory)
       .eq("kind", selectedTransaction.type)
-      .limit(1)
       .maybeSingle();
 
     if (categoryError) throw categoryError;
 
     if (!categoryRow) {
       throw new Error(
-        `The category "${databaseCategoryName}" is not available for this transaction type.`
+        "That category is no longer available. Please choose another category from Settings."
       );
     }
 
@@ -1602,7 +1584,7 @@ const updatedTransaction: Transaction = {
   ...selectedTransaction,
   name: trimmedName,
   amount: value,
-  category: databaseCategoryName,
+  category: categoryRow.name,
   date: editDate,
   notes: editNotes.trim() || null,
   shares: isChangingSharedExpenseAmount
@@ -3112,13 +3094,51 @@ return (
       />
     </label>
 
-    <label>
+    <label className="transaction-edit-category-field">
       Category
-      <input
-        type="text"
-        value={editCategory}
-        onChange={(event) => setEditCategory(event.target.value)}
-      />
+      <span className="transaction-edit-category-control">
+        <select
+          className="transaction-edit-category-select"
+          value={editCategory}
+          onChange={(event) => setEditCategory(event.target.value)}
+          required
+          aria-label="Select transaction category"
+        >
+          <option value="">Choose a category</option>
+          {categories
+            .filter((item) =>
+              item.kind === selectedTransaction.type &&
+              item.parent_id === null &&
+              (item.is_active || categories.some((child) =>
+                child.parent_id === item.id && child.id === editCategory
+              ) || item.id === editCategory)
+            )
+            .map((parent) => {
+              const children = categories.filter((item) =>
+                item.parent_id === parent.id &&
+                (item.is_active || item.id === editCategory)
+              );
+
+              return children.length > 0 ? (
+                <optgroup key={parent.id} label={`${parent.icon || "📁"} ${parent.name}`}>
+                  {children.map((child) => (
+                    <option key={child.id} value={child.id}>
+                      {child.icon || "•"} {child.name}{!child.is_active ? " · Inactive" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : (
+                <option key={parent.id} value={parent.id}>
+                  {parent.icon || "📁"} {parent.name}{!parent.is_active ? " · Inactive" : ""}
+                </option>
+              );
+            })}
+        </select>
+        <span className="transaction-edit-category-chevron" aria-hidden="true">▾</span>
+      </span>
+      <small className="category-select-hint">
+        Choose from your categories in Settings.
+      </small>
     </label>
 
     <label>
@@ -3231,7 +3251,11 @@ return (
         setEditName(selectedTransaction.name);
         setEditAmount(String(selectedTransaction.amount));
         setEditNotes(selectedTransaction.notes ?? "");
-        setEditCategory(selectedTransaction.category);
+        const matchingCategory = categories.find((item) =>
+          item.kind === selectedTransaction.type &&
+          item.name === selectedTransaction.category
+        );
+        setEditCategory(matchingCategory?.id ?? "");
         setEditDate(selectedTransaction.date);
         setEditError("");
         setIsEditingTransaction(true);
