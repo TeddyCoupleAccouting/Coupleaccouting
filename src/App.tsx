@@ -14,6 +14,7 @@ type Transaction = {
     id: string | number;
   name: string;
   category: string;
+  categoryId?: string | null;
   amount: number;
   type: TransactionType;
   space: Space;
@@ -653,6 +654,7 @@ const [activityEndDate, setActivityEndDate] = useState("");
         category: item.category_id
           ? categoryNames.get(item.category_id) ?? "Other Expenses"
           : "Other Expenses",
+        categoryId: item.category_id ?? null,
         amount: Number(item.amount),
         type: item.kind,
         space: item.scope === "shared" ? "household" : "personal",
@@ -1585,6 +1587,7 @@ const updatedTransaction: Transaction = {
   name: trimmedName,
   amount: value,
   category: categoryRow.name,
+  categoryId: categoryRow.id,
   date: editDate,
   notes: editNotes.trim() || null,
   shares: isChangingSharedExpenseAmount
@@ -3096,46 +3099,45 @@ return (
 
     <label className="transaction-edit-category-field">
       Category
-      <span className="transaction-edit-category-control">
-        <select
-          className="transaction-edit-category-select"
-          value={editCategory}
-          onChange={(event) => setEditCategory(event.target.value)}
-          required
-          aria-label="Select transaction category"
-        >
-          <option value="">Choose a category</option>
-          {categories
-            .filter((item) =>
-              item.kind === selectedTransaction.type &&
-              item.parent_id === null &&
-              (item.is_active || categories.some((child) =>
+      <select
+        className="transaction-edit-category-select"
+        value={editCategory}
+        onChange={(event) => setEditCategory(event.target.value)}
+        required
+        aria-label="Select transaction category"
+      >
+        <option value="">Choose a category</option>
+        {categories
+          .filter((item) =>
+            item.kind === selectedTransaction.type &&
+            item.parent_id === null &&
+            (item.is_active ||
+              item.id === editCategory ||
+              categories.some((child) =>
                 child.parent_id === item.id && child.id === editCategory
-              ) || item.id === editCategory)
-            )
-            .map((parent) => {
-              const children = categories.filter((item) =>
-                item.parent_id === parent.id &&
-                (item.is_active || item.id === editCategory)
-              );
+              ))
+          )
+          .map((parent) => {
+            const children = categories.filter((item) =>
+              item.parent_id === parent.id &&
+              (item.is_active || item.id === editCategory)
+            );
 
-              return children.length > 0 ? (
-                <optgroup key={parent.id} label={`${parent.icon || "📁"} ${parent.name}`}>
-                  {children.map((child) => (
-                    <option key={child.id} value={child.id}>
-                      {child.icon || "•"} {child.name}{!child.is_active ? " · Inactive" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : (
-                <option key={parent.id} value={parent.id}>
-                  {parent.icon || "📁"} {parent.name}{!parent.is_active ? " · Inactive" : ""}
-                </option>
-              );
-            })}
-        </select>
-        <span className="transaction-edit-category-chevron" aria-hidden="true">▾</span>
-      </span>
+            return children.length > 0 ? (
+              <optgroup key={parent.id} label={`${parent.icon || "📁"} ${parent.name}`}>
+                {children.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    {child.icon || "•"} {child.name}{!child.is_active ? " · Inactive" : ""}
+                  </option>
+                ))}
+              </optgroup>
+            ) : (
+              <option key={parent.id} value={parent.id}>
+                {parent.icon || "📁"} {parent.name}{!parent.is_active ? " · Inactive" : ""}
+              </option>
+            );
+          })}
+      </select>
       <small className="category-select-hint">
         Choose from your categories in Settings.
       </small>
@@ -3252,6 +3254,9 @@ return (
         setEditAmount(String(selectedTransaction.amount));
         setEditNotes(selectedTransaction.notes ?? "");
         const matchingCategory = categories.find((item) =>
+          item.id === selectedTransaction.categoryId &&
+          item.kind === selectedTransaction.type
+        ) ?? categories.find((item) =>
           item.kind === selectedTransaction.type &&
           item.name === selectedTransaction.category
         );
