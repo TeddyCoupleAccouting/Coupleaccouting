@@ -101,6 +101,7 @@ const [inviteMessage, setInviteMessage] = useState("");
 const [showCreateHousehold, setShowCreateHousehold] = useState(false);
 const [newHouseholdName, setNewHouseholdName] = useState("");
 const [session, setSession] = useState<Session | null>(null);
+const [authLoading, setAuthLoading] = useState(true);
 const [displayName, setDisplayName] = useState("");
 const [profileMessage, setProfileMessage] = useState("");
 const [categories, setCategories] = useState<CategoryRecord[]>([]);
@@ -249,10 +250,12 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
   supabase.auth.getSession().then(({ data, error }) => {
     if (error) {
       console.error("Session check failed:", error.message);
+      setAuthLoading(false);
       return;
     }
 
     setSession(data.session);
+    setAuthLoading(false);
   });
 
   const {
@@ -1712,9 +1715,21 @@ setSharedBalance((current) =>
     }
   }
 
-  if (!session) {
-  return <Auth />;
-}
+  if (authLoading) {
+    return (
+      <div className="auth-screen auth-loading-screen">
+        <div className="auth-loading-card">
+          <span className="auth-brand-icon">♡</span>
+          <strong>together<span className="auth-brand-dot">.</span></strong>
+          <p>Getting your little corner ready...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || window.location.hash.includes("type=recovery")) {
+    return <Auth />;
+  }
 
 return (
   <div className={`app ${personal ? "personal-theme" : "household-theme"}`}>
