@@ -1,6 +1,5 @@
 
-import { Fragment, useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { jsPDF } from "jspdf";
 import type { Session } from "@supabase/supabase-js";
 import "./App.css";
@@ -181,21 +180,18 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
   }, [activeHouseholdId, households]);
 
     useEffect(() => {
-    if (!session) {
-      setHouseholdMembers([]);
+    // Clear the previous household immediately so its members are never
+    // briefly displayed while the newly selected household is loading.
+    setHouseholdMembers([]);
+
+    if (!session?.user || !activeHouseholdId) {
       return;
     }
 
     let cancelled = false;
+    const householdId = activeHouseholdId;
 
     async function loadHouseholdMembers() {
-      if (!activeHouseholdId) {
-        setHouseholdMembers([]);
-        return;
-      }
-      const householdId = activeHouseholdId;
-      // Clear the previous household's members while the newly selected household loads.
-      setHouseholdMembers([]);
 
       const { data: members, error: membersError } = await supabase
         .from("household_members")
@@ -342,7 +338,7 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
     setOpenCategoryMenuId(null);
   }
 
-  async function saveCategory(event: FormEvent<HTMLFormElement>) {
+  async function saveCategory(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session?.user || !categoryHouseholdId) {
       setCategoryMessage("Please sign in and make sure you are in a household.");
@@ -769,10 +765,6 @@ for (const settlement of loadedSettlements) {
 
   const personal = space === "personal";
   const activeHousehold = households.find((home) => home.id === activeHouseholdId) ?? null;
-  // Put the signed-in user first, then show the other member of this selected household.
-  const bannerHouseholdMembers = [...householdMembers]
-    .sort((a, b) => Number(b.user_id === session?.user.id) - Number(a.user_id === session?.user.id))
-    .slice(0, 2);
   const visibleTransactions = transactions.filter(
     (item) => item.space === space
   );
@@ -1158,7 +1150,7 @@ function exportReportPdf() {
 
   
   async function saveTransaction(
-    event: FormEvent<HTMLFormElement>
+    event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
     setSaveError("");
@@ -1877,23 +1869,22 @@ return (
                   <p>Every small step helps build the life you want together.</p>
                 </div>
                 <div className="couple-avatars">
-                  {bannerHouseholdMembers.length > 0 ? (
-                    bannerHouseholdMembers.map((member, index) => (
-                      <Fragment key={member.user_id}>
-                        {index > 0 && <span className="heart-between">♥</span>}
-                        <div className="couple-member">
-                          <div className={`big-avatar ${index === 0 ? "bear" : "bunny"}`}>
-                            {member.avatar || (index === 0 ? "🐻" : "🐰")}
-                          </div>
-                          <span>{member.display_name}</span>
-                        </div>
-                      </Fragment>
-                    ))
-                  ) : (
-                    <div className="couple-member">
-                      <div className="big-avatar bear">♡</div>
-                      <span>Your household</span>
+                  {householdMembers.slice(0, 2).map((member, index) => (
+                    <div className="couple-member" key={member.user_id}>
+                      <div className={`big-avatar ${index === 0 ? "bear" : "bunny"}`}>
+                        {member.avatar || (index === 0 ? "🐻" : "🐰")}
+                      </div>
+                      <span>{member.display_name}</span>
                     </div>
+                  ))}
+                  {householdMembers.length > 1 && (
+                    <span className="heart-between">♥</span>
+                  )}
+                  {householdMembers.length === 1 && (
+                    <span className="couple-invite-hint">Invite your partner ♡</span>
+                  )}
+                  {householdMembers.length === 0 && (
+                    <span className="couple-invite-hint">Your household starts here ♡</span>
                   )}
                 </div>
                 <span className="banner-decoration decoration-one">✦</span>

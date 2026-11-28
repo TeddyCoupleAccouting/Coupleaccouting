@@ -1017,6 +1017,15 @@ body {
   font-size: 21px;
 }
 
+.couple-invite-hint {
+  max-width: 130px;
+  color: #8b7b98;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .banner-decoration {
   position: absolute;
   color: #d5c1e9;
