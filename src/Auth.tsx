@@ -114,7 +114,7 @@ export default function Auth() {
       password,
       options: {
         data: { display_name: displayName.trim() },
-        emailRedirectTo: "https://coupleaccounting.vercel.app/",
+        emailRedirectTo: "https://coupleaccouting.vercel.app",
       },
     });
 
