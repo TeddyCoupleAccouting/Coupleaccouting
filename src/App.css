@@ -5253,3 +5253,48 @@ body {
     line-height: 1.5;
   }
 }
+
+
+/* Create-household action in the empty household banner */
+.couple-create-household-button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border: 1px solid #d9c7eb;
+  border-radius: 12px;
+  background: #8d6ab5;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 5px 14px #76519e20;
+  transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.couple-create-household-button:hover {
+  background: #7955a2;
+  transform: translateY(-1px);
+  box-shadow: 0 7px 17px #76519e2b;
+}
+.couple-create-household-button:focus-visible {
+  outline: 3px solid #d9c6ed;
+  outline-offset: 3px;
+}
+.household-create-backdrop { z-index: 1100; }
+.household-create-modal { max-width: 440px; }
+.household-create-modal .modal-heading { margin-bottom: 22px; }
+.household-create-modal .modal-heading h2 { margin: 7px 0 6px; color: #30283a; font-size: 23px; letter-spacing: -.7px; }
+.household-create-modal .modal-heading p { max-width: 340px; font-size: 12px; }
+.household-create-label { display:block; margin-bottom:8px; color:#51465c; font-size:12px; font-weight:700; }
+.household-create-name-input { width:100%; min-width:0; height:46px; padding:0 14px; border:1px solid #e4d8ed; border-radius:12px; outline:none; background:#fdfcff; color:#30283a; font:inherit; font-size:14px; }
+.household-create-name-input:focus { border-color:#b493d4; box-shadow:0 0 0 4px #eee5f8; }
+.household-create-modal-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:22px; }
+.household-create-modal-actions .secondary-button { min-height:42px; padding:10px 15px; border:1px solid #e9e0ef; border-radius:11px; background:#fff; color:#776d83; }
+.household-create-modal-actions .primary-button { min-height:42px; padding:10px 16px; }
+@media (max-width:600px) {
+  .couple-create-household-button { min-height:36px; padding:9px 11px; font-size:10px; }
+}

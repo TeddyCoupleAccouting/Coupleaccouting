@@ -86,6 +86,8 @@ export default function App() {
 const [showAllRepayments, setShowAllRepayments] = useState(false);
 const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
 const [households, setHouseholds] = useState<HouseholdRecord[]>([]);
+const [householdsLoading, setHouseholdsLoading] = useState(true);
+const [householdsLoadFailed, setHouseholdsLoadFailed] = useState(false);
 const [activeHouseholdId, setActiveHouseholdId] = useState<string | null>(null);
 const [householdSettingsTab, setHouseholdSettingsTab] = useState<"general" | "members" | "invitations" | "permissions">("general");
 const [settingsSection, setSettingsSection] = useState<"profile" | "households" | "personal" | "preferences">("profile");
@@ -99,6 +101,7 @@ const [memberAvatarDraft, setMemberAvatarDraft] = useState("🐻");
 const [inviteEmail, setInviteEmail] = useState("");
 const [inviteMessage, setInviteMessage] = useState("");
 const [showCreateHousehold, setShowCreateHousehold] = useState(false);
+const [showCreateHouseholdModal, setShowCreateHouseholdModal] = useState(false);
 const [newHouseholdName, setNewHouseholdName] = useState("");
 const [session, setSession] = useState<Session | null>(null);
 const [authLoading, setAuthLoading] = useState(true);
@@ -123,9 +126,13 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
     if (!session?.user) {
       setHouseholds([]);
       setActiveHouseholdId(null);
+      setHouseholdsLoading(false);
+      setHouseholdsLoadFailed(false);
       return;
     }
     let cancelled = false;
+    setHouseholdsLoading(true);
+    setHouseholdsLoadFailed(false);
     async function loadHouseholds() {
       const { data: memberships, error } = await supabase
         .from("household_members")
@@ -133,11 +140,20 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
         .eq("user_id", session!.user.id);
       if (error) {
         console.error("Failed to load households:", error.message);
+        if (!cancelled) {
+          setHouseholdsLoadFailed(true);
+          setHouseholdsLoading(false);
+        }
         return;
       }
       const ids = (memberships ?? []).map((row) => row.household_id);
       if (!ids.length) {
-        if (!cancelled) { setHouseholds([]); setActiveHouseholdId(null); }
+        if (!cancelled) {
+          setHouseholds([]);
+          setActiveHouseholdId(null);
+          setHouseholdsLoading(false);
+          setHouseholdsLoadFailed(false);
+        }
         return;
       }
       const { data: rows, error: householdError } = await supabase
@@ -147,6 +163,10 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
         .order("created_at", { ascending: true });
       if (householdError) {
         console.error("Failed to load household details:", householdError.message);
+        if (!cancelled) {
+          setHouseholdsLoadFailed(true);
+          setHouseholdsLoading(false);
+        }
         return;
       }
       const roleById = new Map((memberships ?? []).map((row) => [row.household_id, row.role]));
@@ -165,6 +185,8 @@ const [showCategoryEditor, setShowCategoryEditor] = useState(false);
       if (!cancelled) {
         setHouseholds(loaded);
         setActiveHouseholdId((current) => current && loaded.some((h) => h.id === current) ? current : loaded[0]?.id ?? null);
+        setHouseholdsLoading(false);
+        setHouseholdsLoadFailed(false);
       }
     }
     void loadHouseholds();
@@ -440,6 +462,7 @@ async function createHousehold() {
   setActiveHouseholdId(created.id);
   setNewHouseholdName("");
   setShowCreateHousehold(false);
+  setShowCreateHouseholdModal(false);
   setHouseholdMessage("Your new household is ready!");
   setHouseholdSaving(false);
 }
@@ -1869,22 +1892,35 @@ return (
                   <p>Every small step helps build the life you want together.</p>
                 </div>
                 <div className="couple-avatars">
-                  {householdMembers.slice(0, 2).map((member, index) => (
-                    <div className="couple-member" key={member.user_id}>
-                      <div className={`big-avatar ${index === 0 ? "bear" : "bunny"}`}>
-                        {member.avatar || (index === 0 ? "🐻" : "🐰")}
-                      </div>
-                      <span>{member.display_name}</span>
-                    </div>
-                  ))}
-                  {householdMembers.length > 1 && (
-                    <span className="heart-between">♥</span>
-                  )}
-                  {householdMembers.length === 1 && (
-                    <span className="couple-invite-hint">Invite your partner ♡</span>
-                  )}
-                  {householdMembers.length === 0 && (
-                    <span className="couple-invite-hint">Your household starts here ♡</span>
+                  {!householdsLoading && !householdsLoadFailed && households.length === 0 ? (
+                    <button
+                      type="button"
+                      className="couple-create-household-button"
+                      onClick={() => {
+                        setNewHouseholdName("");
+                        setHouseholdMessage("");
+                        setShowCreateHouseholdModal(true);
+                      }}
+                    >
+                      ＋ Create household
+                    </button>
+                  ) : (
+                    <>
+                      {householdMembers.slice(0, 2).map((member, index) => (
+                        <div className="couple-member" key={member.user_id}>
+                          <div className={`big-avatar ${index === 0 ? "bear" : "bunny"}`}>
+                            {member.avatar || (index === 0 ? "🐻" : "🐰")}
+                          </div>
+                          <span>{member.display_name}</span>
+                        </div>
+                      ))}
+                      {householdMembers.length > 1 && (
+                        <span className="heart-between">♥</span>
+                      )}
+                      {households.length > 0 && householdMembers.length === 1 && (
+                        <span className="couple-invite-hint">Invite your partner ♡</span>
+                      )}
+                    </>
                   )}
                 </div>
                 <span className="banner-decoration decoration-one">✦</span>
@@ -3303,6 +3339,42 @@ return (
     </button>
   </div>
 )}
+          </section>
+        </div>
+      )}
+
+      {showCreateHouseholdModal && (
+        <div className="modal-backdrop household-create-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !householdSaving) setShowCreateHouseholdModal(false);
+        }}>
+          <section className="transaction-modal household-create-modal" role="dialog" aria-modal="true" aria-labelledby="create-household-title">
+            <div className="modal-heading">
+              <div>
+                <span className="section-kicker">YOUR LITTLE SPACE</span>
+                <h2 id="create-household-title">Create your household 🏡</h2>
+                <p className="welcome-description">Give your shared space a name. You can invite someone to join later.</p>
+              </div>
+              <button type="button" className="category-modal-close" aria-label="Close" disabled={householdSaving} onClick={() => setShowCreateHouseholdModal(false)}>×</button>
+            </div>
+            <label className="household-create-label" htmlFor="new-household-name">Household name</label>
+            <input
+              id="new-household-name"
+              className="household-create-name-input"
+              value={newHouseholdName}
+              onChange={(event) => setNewHouseholdName(event.target.value)}
+              placeholder="e.g. Our Home"
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && newHouseholdName.trim() && !householdSaving) void createHousehold();
+              }}
+            />
+            {householdMessage && <p className="household-status-message" role="status">{householdMessage}</p>}
+            <div className="household-create-modal-actions">
+              <button type="button" className="secondary-button" disabled={householdSaving} onClick={() => setShowCreateHouseholdModal(false)}>Cancel</button>
+              <button type="button" className="primary-button" disabled={householdSaving || !newHouseholdName.trim()} onClick={() => void createHousehold()}>
+                {householdSaving ? "Creating..." : "Create household"}
+              </button>
+            </div>
           </section>
         </div>
       )}
